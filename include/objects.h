@@ -34,7 +34,7 @@ typedef struct
     /* 0x7C */ s32 unk_07C;
     /* 0x80 */ s32 unk_080;
     /* 0x84 */ s16 unk_084[0xA];
-    /* 0x98 */ s16 unk_098;
+    /* 0x98 */ u16 unk_098;
     /* 0x9A */ s16 unk_09A;
     /* 0x9C */ s16 unk_09C;
     /* 0x9E */ s16 unk_09E;
@@ -80,8 +80,15 @@ typedef struct
 // This is the object list
 extern struct_80165C18_entry D_80165C18[];
 
-// This is another list of indices in D_80165C18.
+// This are other lists of indices in D_80165C18.
+extern s32 D_80183DB8[];
 extern s32 D_80183DD8[];
+
+// Appears to be a list of object list indices for the Item Window part of the HUD
+extern s32 gItemWindowObjectByPlayerId[];
+
+// Used for loop bounds when accessing D_80183EA0
+extern s16 D_80165750;
 
 /**
  * D_80183EA0, D_80183F28, D_8018BFA8, and D_8018C030 are all lists of indices in D_80165C18.
@@ -92,8 +99,68 @@ extern s32 D_80183DD8[];
  **/ 
 
 extern s32 D_80183EA0[];
+/**
+ * Snowmen in Frappe Snowlad
+**/
 extern s32 D_80183F28[];
 extern s32 D_8018BFA8[];
 extern s32 D_8018C030[];
+
+#define D_8018C1B0_SIZE 0x80
+#define NUM_MOLES 0x1F
+#define NUM_SNOWFLAKES 0x32
+/**
+ * List of object list indices used for:
+ *   Moles in Moo Moo Farm
+ *   Snow flakes in Frappe Snowland
+ *   Segments of the fire breath from the statues in Bowser's Castle
+ *   Potentially other things
+**/
+extern s32 D_8018C1B0[];
+// Next free spot in D_8018C1B0? Wraps back around to 0 if it gets bigger than D_8018C1B0_SIZE
+extern s32 D_80183E38;
+// Used for cycling through snowflakes in func_80078790
+extern s16 D_8018D174;
+
+#define D_8018C3F0_SIZE 0x80
+/**
+ * List of object list indices used for:
+ *   Bats in Banshee's Boardwalk (but only 1 player mode?)
+**/
+extern s32 D_8018C3F0[];
+// Next free spot in D_8018C3F0? Wraps back around to 0 if it gets bigger than D_8018C3F0_SIZE
+extern s32 D_80183E4C;
+
+#define D_8018C630_SIZE 0x80
+extern s32 D_8018C630[];
+// Next free spot in D_8018C630?
+extern s32 D_80183E5C;
+extern s16 D_80165730;
+// Tracking a count of some object type, don't know what object type yet
+extern s16 D_80165738;
+
+#define D_8018C870_SIZE 0x40
+/**
+ * List of object list indices. Used both for the fires in the DK Jungle cave
+ * and, seemingly for the trail that shells leave behind them.
+ * I think they're using the same texture, which would explain the dual use
+**/
+extern s32 D_8018C870[];
+// Next free spot in D_8018C870? Wraps back around to 0 if it gets bigger than D_8018C870_SIZE
+extern s32 D_80183E6C;
+
+// Maximum number of leaves that can be falling?
+#define D_8018C970_SIZE 0x40
+// Number of leaves to spawn each bonk?
+#define D_8018C970_SPAWN_SIZE 0x14
+// Seemingly a list of object list indices used for the leaves that sometimes fall
+// trees when you bonk into them
+extern s32 D_8018C970[];
+// Next free spot in D_8018C970? Wraps back around to 0 if it gets bigger than D_8018C970_SIZE
+extern s32 D_80183E7C;
+
+// List of object list indices used by the clouds and stars in some stages
+// Also used for snowflakes like D_8018C1B0? Not sure what's up with that
+extern s32 D_8018CC80[];
 
 #endif

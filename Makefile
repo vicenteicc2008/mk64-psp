@@ -21,6 +21,8 @@ ifeq ($(VERSION),us)
   TARGET := mk64.us
 endif
 
+ BASEROM := baserom.$(VERSION).z64
+
 # COMPILER - selects the C compiler to use
 #   ido - uses the SGI IRIS Development Option compiler, which is used to build
 #         an original matching N64 ROM
@@ -39,19 +41,21 @@ BUILD_DIR_BASE := build
 BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)
 
 # Directories containing source files
+ASSET_DIR := assets
+BIN_DIR := bin
+DATA_DIR := data
 INCLUDE_DIRS := include
 SRC_DIRS := src src/audio src/os src/os/math courses
-ASM_DIRS := asm asm/audio asm/os asm/os/non_matchings data data/sound_data
-COURSE_DIRS :=        \
-	courses/mushroom_cup/luigi_raceway courses/mushroom_cup/koopa_beach        \
-	courses/mushroom_cup/moo_moo_farm courses/mushroom_cup/kalimari_desert courses/flower_cup/toads_turnpike courses/flower_cup/frappe_snowland                     \
-	courses/flower_cup/choco_mountain courses/flower_cup/mario_raceway courses/star_cup/wario_stadium courses/star_cup/sherbet_land courses/star_cup/royal_raceway  \
-	courses/star_cup/bowsers_castle courses/special_cup/dks_jungle_parkway courses/special_cup/yoshi_valley courses/special_cup/banshee_boardwalk                   \
-	courses/special_cup/rainbow_road courses/battle/big_donut courses/battle/block_fort courses/battle/double_deck courses/battle/skyscraper
+ASM_DIRS := asm asm/audio asm/os asm/os/non_matchings $(DATA_DIR) $(DATA_DIR)/sound_data $(DATA_DIR)/karts
+COURSE_DIRS := $(shell find courses -mindepth 2 -type d)
 
 TEXTURES_DIR = textures
+TEXTURE_DIRS := textures/common
 
-ALL_DIRS = $(BUILD_DIR) $(addprefix $(BUILD_DIR)/,$(SRC_DIRS) $(COURSE_DIRS) $(INCLUDE_DIRS) $(ASM_DIRS) $(ALL_KARTS_DIRS) $(TEXTURES_DIR)/raw $(TEXTURES_DIR)/standalone $(TEXTURES_DIR)/startup_logo $(TEXTURES_DIR)/crash_screen $(TEXTURES_DIR)/trophy)
+ALL_DIRS = $(BUILD_DIR) $(addprefix $(BUILD_DIR)/,$(SRC_DIRS) $(COURSE_DIRS) $(INCLUDE_DIRS) $(ASM_DIRS) $(ALL_KARTS_DIRS) $(TEXTURES_DIR)/raw \
+	$(TEXTURES_DIR)/standalone $(TEXTURES_DIR)/startup_logo $(TEXTURES_DIR)/crash_screen $(TEXTURES_DIR)/trophy $(TEXTURES_DIR)/courses        \
+	$(TEXTURES_DIR)/courses/tlut $(TEXTURES_DIR)/courses/tlut2 $(TEXTURE_DIRS) $(TEXTURE_DIRS)/tlut $(TEXTURES_DIR)/courses/tlut3              \
+	$(TEXTURE_DIRS)/tlut2 $(BIN_DIR))
 
 ################### Universal Dependencies ###################
 
@@ -94,12 +98,12 @@ COURSE_ASM_FILES := $(wildcard courses/*/*/packed.s)
 
 C_FILES := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c))
 S_FILES := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.s)) $(COURSE_ASM_FILES)
-COURSE_FILES := $(foreach dir,$(COURSE_DIRS),$(wildcard $(dir)/model.inc.c))
+COURSE_FILES := $(foreach dir,$(COURSE_DIRS),$(wildcard $(dir)/*.inc.c))
 
 # Object files
 O_FILES := $(foreach file,$(C_FILES),$(BUILD_DIR)/$(file:.c=.o)) \
 		   $(foreach file,$(COURSE_FILES),$(BUILD_DIR)/$(file:.c=.o)) \
-           $(foreach file,$(S_FILES),$(BUILD_DIR)/$(file:.s=.o))
+           $(foreach file,$(S_FILES),$(BUILD_DIR)/$(file:.s=.o)) \
 
 # Automatic dependency files
 DEP_FILES := $(O_FILES:.o=.d) $(BUILD_DIR)/$(LD_SCRIPT).d
@@ -161,13 +165,13 @@ CC_CFLAGS := -fno-builtin
 INCLUDE_CFLAGS := -I include -I $(BUILD_DIR) -I $(BUILD_DIR)/include -I src -I .
 
 # TODO: Seperate F3D declares into version flags if needed.
-GRUCODE_CFLAGS = -DF3DEX_GBI -D_LANGUAGE_C
+GRUCODE_CFLAGS = -DF3DEX_GBI -DF3D_OLD -D_LANGUAGE_C
 
 # Check code syntax with host compiler
-CC_CHECK := gcc -fsyntax-only -fsigned-char $(CC_CFLAGS) $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) -std=gnu90 -Wall -Wextra -Wno-format-security -Wno-main -DNON_MATCHING -DAVOID_UB $(VERSION_CFLAGS) $(GRUCODE_CFLAGS)
+CC_CHECK := gcc -fsyntax-only -fsigned-char $(CC_CFLAGS) $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) -std=gnu90 -Wall -Wempty-body -Wextra -Wno-format-security -Wno-main -DNON_MATCHING -DAVOID_UB $(VERSION_CFLAGS) $(GRUCODE_CFLAGS)
 
 ASFLAGS = -march=vr4300 -mabi=32 -I include -I $(BUILD_DIR) --defsym F3DEX_GBI=1
-CFLAGS = -Wab,-r4300_mul -non_shared -G 0 -Xcpluscomm -Xfullwarn -signed $(OPT_FLAGS) $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) $(VERSION_CFLAGS) $(MIPSISET) $(GRUCODE_CFLAGS)
+CFLAGS = -Wab,-r4300_mul -non_shared -G 0 -Xcpluscomm -Xfullwarn -woff 838,649 -signed $(OPT_FLAGS) $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) $(VERSION_CFLAGS) $(MIPSISET) $(GRUCODE_CFLAGS)
 OBJCOPYFLAGS = --pad-to=0xC00000 --gap-fill=0xFF
 
 LDFLAGS = -T undefined_syms.txt -T $(BUILD_DIR)/$(LD_SCRIPT) -Map $(BUILD_DIR)/$(TARGET).map --no-check-sections
@@ -186,8 +190,12 @@ endif
 MIO0TOOL = $(TOOLS_DIR)/mio0
 N64CKSUM = $(TOOLS_DIR)/n64cksum
 N64GRAPHICS = $(TOOLS_DIR)/n64graphics
+DLPACKER = $(TOOLS_DIR)/displaylist_packer
+DLSYMGEN = $(PYTHON) $(TOOLS_DIR)/generate_segment_headers.py
+MODELSYMGEN = $(PYTHON) $(TOOLS_DIR)/generate_vertice_count.py
 BIN2C = $(PYTHON) $(TOOLS_DIR)/bin2c.py
 EXTRACT_DATA_FOR_MIO  := $(TOOLS_DIR)/extract_data_for_mio
+ASSET_EXTRACT := $(PYTHON) $(TOOLS_DIR)/new_extract_assets.py
 EMULATOR = mupen64plus
 EMU_FLAGS = --noosd
 LOADER = loader64
@@ -212,7 +220,7 @@ endif
 clean:
 	$(RM) -r $(BUILD_DIR)
 
-distclean:
+distclean: distclean_assets
 	$(RM) -r $(BUILD_DIR_BASE)
 	./extract_assets.py --clean
 	make -C tools clean
@@ -228,7 +236,7 @@ $(BUILD_DIR)/%: %.png
 
 $(BUILD_DIR)/textures/%.mio0: $(BUILD_DIR)/textures/%
 	$(MIO0TOOL) -c $< $@
-	
+
 #################### Compressed Segments #####################
 
 $(BUILD_DIR)/%.mio0: %.bin
@@ -263,210 +271,117 @@ $(BUILD_DIR)/src/startup_logo.inc.o: src/startup_logo.inc.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 	$(PYTHON) tools/set_o32abi_bit.py $@
 
+############################### Assets ###############################
+
+ASSET_INCLUDES := $(shell find $(ASSET_DIR)/include -type f -name *.mk)
+ASSET_DIRECTORIES :=
+
+$(foreach inc,$(ASSET_INCLUDES),$(eval include $(inc)))
+
+distclean_assets:
+	rm -rf $(ASSET_DIRECTORIES)
+
+##########################################################################################
+
+TEXTURE_FILES := $(foreach dir,$(TEXTURE_DIRS),$(subst .png, , $(wildcard $(dir)/*)))
+#TEXTURE_FILES_C := $(foreach file,$(TEXTURE_FILES),$(BUILD_DIR)/$(file:.png=.inc.c))
+
+TEXTURE_FILES_TLUT := $(foreach dir,$(TEXTURE_DIRS)/tlut,$(subst .png, , $(wildcard $(dir)/*)))
+
+TEXTURE_FILES_TLUT2 := $(foreach dir,$(TEXTURE_DIRS)/tlut2,$(subst .png, , $(wildcard $(dir)/*)))
+
+
+$(TEXTURE_FILES):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8
+
+# TLUT
+$(TEXTURE_FILES_TLUT):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8 -c $(lastword $(subst ., ,$(subst .$(lastword $(subst ., ,$(TEXTURE_FILES_TLUT))), ,$(TEXTURE_FILES_TLUT)))) -p $(BUILD_DIR)/$@.tlut.inc.c
+
+$(TEXTURE_FILES_TLUT2):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8 -c $(lastword $(subst ., ,$(subst .$(lastword $(subst ., ,$(TEXTURE_FILES_TLUT2))), ,$(TEXTURE_FILES_TLUT2)))) -p $(BUILD_DIR)/$@.tlut.inc.c -m 0xFFFF
+
 # common textures
-$(BUILD_DIR)/src/common_textures.inc.o: src/common_textures.inc.c
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_00000_tlut.rgba16.inc.c -g textures/132B50_00000_tlut.rgba16.png -f rgba16 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_00200.rgba16.inc.c -g textures/132B50_00200.rgba16.png -f rgba16 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_01EE8.rgba16.inc.c -g textures/132B50_01EE8.rgba16.png -f rgba16 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_03348.rgba16.inc.c -g textures/132B50_03348.rgba16.png -f rgba16 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_03B48.rgba16.inc.c -g textures/132B50_03B48.rgba16.png -f rgba16 -s u8
-	
-	$(BIN2C) textures/132B50_04C68_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_04C68_tlut.rgba16
-	$(BIN2C) textures/132B50_04E38_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_04E38_tlut.rgba16
-	$(BIN2C) textures/132B50_04E68_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_04E68_tlut.rgba16
-	$(BIN2C) textures/132B50_05068_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_05068_tlut.rgba16
-	
-	
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_04C68_tlut.rgba16.inc.c -g textures/132B50_04C68_tlut.rgba16.png -f rgba16 -s u8
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_04E68_tlut.rgba16.inc.c -g textures/132B50_04E68_tlut.rgba16.png -f rgba16 -s u8
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_05068_tlut.rgba16.inc.c -g textures/132B50_05068_tlut.rgba16.png -f rgba16 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_06A58.i4.inc.c -g textures/132B50_06A58.i4.png -f i4 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_06AD8.ia8.inc.c -g textures/132B50_06AD8.ia8.png -f ia8 -s u8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_06EF8.rgba16.ci4.inc.c -g textures/132B50_06EF8.rgba16.ci4.png -f ci4 -s u8 -c rgba16 -w 128 -h 32 -p textures/132B50_06ED8_tlut_gen.rgba16.bin
-	$(BIN2C) textures/132B50_06ED8_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_06ED8_tlut.rgba16
-	
-	
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_08150.ia8.inc.c -g textures/132B50_08150.ia8.png -f ia8 -s u8 -w 100 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_08470.ia8.inc.c -g textures/132B50_08470.ia8.png -f ia8 -s u8 -w 100 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_08790.ia8.inc.c -g textures/132B50_08790.ia8.png -f ia8 -s u8 -w 100 -h 8
+$(BUILD_DIR)/src/common_textures.inc.o: src/common_textures.inc.c $(TEXTURE_FILES) $(TEXTURE_FILES_TLUT) $(TEXTURE_FILES_TLUT2)
 
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_09958.i4.inc.c -g textures/132B50_09958.i4.png -s u8 -w 64 -h 96 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0A558.i4.inc.c -g textures/132B50_0A558.i4.png -s u8 -w 64 -h 16 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0A958.rgba16.inc.c -g textures/132B50_0A958.rgba16.png -s u8 -w 32 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0AB58.rgba16.inc.c -g textures/132B50_0AB58.rgba16.png -s u8 -w 32 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0AD58.rgba16.inc.c -g textures/132B50_0AD58.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0B158.rgba16.inc.c -g textures/132B50_0B158.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0B558.rgba16.inc.c -g textures/132B50_0B558.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0B958.rgba16.inc.c -g textures/132B50_0B958.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0BD58.rgba16.inc.c -g textures/132B50_0BD58.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0C158.rgba16.inc.c -g textures/132B50_0C158.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0C558.rgba16.inc.c -g textures/132B50_0C558.rgba16.png -s u8 -w 104 -h 16
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0D258.i4.inc.c -g textures/132B50_0D258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0E258.i4.inc.c -g textures/132B50_0E258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_0F258.i4.inc.c -g textures/132B50_0F258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_10258.i4.inc.c -g textures/132B50_10258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_11258.i4.inc.c -g textures/132B50_11258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_12258.i4.inc.c -g textures/132B50_12258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_13258.i4.inc.c -g textures/132B50_13258.i4.png -s u8 -w 128 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_14258.i4.inc.c -g textures/132B50_14258.i4.png -s u8 -w 128 -h 64 -f i4
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_15258.i4.inc.c -g textures/132B50_15258.i4.png -s u8 -w 64 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_15A58.i4.inc.c -g textures/132B50_15A58.i4.png -s u8 -w 64 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_16258.i4.inc.c -g textures/132B50_16258.i4.png -s u8 -w 64 -h 64 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_16A58.i4.inc.c -g textures/132B50_16A58.i4.png -s u8 -w 64 -h 64 -f i4
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_17258_tlut.rgba16.inc.c -g textures/132B50_17258_tlut.rgba16.png -s u8 -w 38 -h 6
-	
-	$(BIN2C) textures/132B50_17458_combined_data.bin $(BUILD_DIR)/textures/132B50_17458_combined_data
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_17458.rgba16.ci8.inc.c -g textures/132B50_17458.rgba16.ci8.png -s u8 -w 64 -h 32 -c rgba16 -p textures/132B50_17258_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_17C58.rgba16.ci8.inc.c -g textures/132B50_17C58.rgba16.ci8.png -s u8 -w 64 -h 32 -c rgba16 -p textures/132B50_17258_tlut.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_18458.rgba16.ci8.inc.c -g textures/132B50_18458.rgba16.ci8.png -s u8 -w 64 -h 32 -c rgba16 -p textures/132B50_17258_tlut.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_18C58.rgba16.ci8.inc.c -g textures/132B50_18C58.rgba16.ci8.png -s u8 -w 64 -h 32 -c rgba16 -p textures/132B50_17258_tlut.bin
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19458_tlut.rgba16.inc.c -g textures/132B50_19458_tlut.rgba16.png -s u8 -w 16 -h 16
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19658.rgba16.ci8.inc.c -g textures/132B50_19658.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19758.rgba16.ci8.inc.c -g textures/132B50_19758.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19858.rgba16.ci8.inc.c -g textures/132B50_19858.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19958.rgba16.ci8.inc.c -g textures/132B50_19958.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19A58.rgba16.ci8.inc.c -g textures/132B50_19A58.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19B58.rgba16.ci8.inc.c -g textures/132B50_19B58.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19C58.rgba16.ci8.inc.c -g textures/132B50_19C58.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_19D58.rgba16.ci8.inc.c -g textures/132B50_19D58.rgba16.ci8.png -s u8 -w 16 -h 16 -c rgba16 -p textures/132B50_19458_tlut.rgba16.png
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A058.rgba16.ci8.inc.c -g textures/132B50_1A058.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A098.rgba16.ci8.inc.c -g textures/132B50_1A098.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A0D8.rgba16.ci8.inc.c -g textures/132B50_1A0D8.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A118.rgba16.ci8.inc.c -g textures/132B50_1A118.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A158.rgba16.ci8.inc.c -g textures/132B50_1A158.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A198.rgba16.ci8.inc.c -g textures/132B50_1A198.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A1D8.rgba16.ci8.inc.c -g textures/132B50_1A1D8.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A218.rgba16.ci8.inc.c -g textures/132B50_1A218.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A258.rgba16.ci8.inc.c -g textures/132B50_1A258.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A298.rgba16.ci8.inc.c -g textures/132B50_1A298.rgba16.ci8.png -s u8 -w 8 -h 8 -c rgba16 -p textures/132B50_19E58_tlut.rgba16.png
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A2D8.ia4.inc.c -g textures/132B50_1A2D8.ia4.png -s u8 -f ia4
-
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A4D8_tlut.rgba16.inc.c -g textures/132B50_1A4D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A6D8_tlut.rgba16.inc.c -g textures/132B50_1A6D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1A8D8_tlut.rgba16.inc.c -g textures/132B50_1A8D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1AAD8_tlut.rgba16.inc.c -g textures/132B50_1AAD8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1ACD8_tlut.rgba16.inc.c -g textures/132B50_1ACD8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1AED8_tlut.rgba16.inc.c -g textures/132B50_1AED8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1B0D8_tlut.rgba16.inc.c -g textures/132B50_1B0D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1B2D8_tlut.rgba16.inc.c -g textures/132B50_1B2D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1B4D8_tlut.rgba16.inc.c -g textures/132B50_1B4D8_tlut.rgba16.png -s u8 -w 16 -h 16
-
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1B6D8.rgba16.ci8.inc.c -g textures/132B50_1B6D8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1A4D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1BAD8.rgba16.ci8.inc.c -g textures/132B50_1BAD8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1A6D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1BED8.rgba16.ci8.inc.c -g textures/132B50_1BED8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1A8D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1C2D8.rgba16.ci8.inc.c -g textures/132B50_1C2D8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1AAD8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1C6D8.rgba16.ci8.inc.c -g textures/132B50_1C6D8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1ACD8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1CAD8.rgba16.ci8.inc.c -g textures/132B50_1CAD8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1AED8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1CED8.rgba16.ci8.inc.c -g textures/132B50_1CED8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1B0D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1D2D8.rgba16.ci8.inc.c -g textures/132B50_1D2D8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1B2D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1D6D8.rgba16.ci8.inc.c -g textures/132B50_1D6D8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1B4D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1DAD8.rgba16.ci8.inc.c -g textures/132B50_1DAD8.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_1B4D8_tlut_gen.rgba16.bin
-	$(BIN2C) textures/132B50_1DAD8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_1DAD8.rgba16.ci8
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1DED8_tlut.rgba16.inc.c -g textures/132B50_1DED8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1E0D8_tlut.rgba16.inc.c -g textures/132B50_1E0D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1E2D8_tlut.rgba16.inc.c -g textures/132B50_1E2D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1E4D8_tlut.rgba16.inc.c -g textures/132B50_1E4D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1E6D8_tlut.rgba16.inc.c -g textures/132B50_1E6D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1E8D8_tlut.rgba16.inc.c -g textures/132B50_1E8D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1EAD8_tlut.rgba16.inc.c -g textures/132B50_1EAD8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1ECD8_tlut.rgba16.inc.c -g textures/132B50_1ECD8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1EED8_tlut.rgba16.inc.c -g textures/132B50_1EED8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1F0D8_tlut.rgba16.inc.c -g textures/132B50_1F0D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1F2D8_tlut.rgba16.inc.c -g textures/132B50_1F2D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1F4D8_tlut.rgba16.inc.c -g textures/132B50_1F4D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1F6D8_tlut.rgba16.inc.c -g textures/132B50_1F6D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1F8D8_tlut.rgba16.inc.c -g textures/132B50_1F8D8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1FAD8_tlut.rgba16.inc.c -g textures/132B50_1FAD8_tlut.rgba16.png -s u8 -w 16 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1FCD8_tlut.rgba16.inc.c -g textures/132B50_1FCD8_tlut.rgba16.png -s u8 -w 16 -h 16
-
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_1FED8.rgba16.ci8.inc.c -g textures/132B50_1FED8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1DED8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_203D8.rgba16.ci8.inc.c -g textures/132B50_203D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1E0D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_208D8.rgba16.ci8.inc.c -g textures/132B50_208D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1E2D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_20DD8.rgba16.ci8.inc.c -g textures/132B50_20DD8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1E4D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_212D8.rgba16.ci8.inc.c -g textures/132B50_212D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1E6D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_217D8.rgba16.ci8.inc.c -g textures/132B50_217D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1E8D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_21CD8.rgba16.ci8.inc.c -g textures/132B50_21CD8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1EAD8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_221D8.rgba16.ci8.inc.c -g textures/132B50_221D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1ECD8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_226D8.rgba16.ci8.inc.c -g textures/132B50_226D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1EED8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_22BD8.rgba16.ci8.inc.c -g textures/132B50_22BD8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1F0D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_230D8.rgba16.ci8.inc.c -g textures/132B50_230D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1F2D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_235D8.rgba16.ci8.inc.c -g textures/132B50_235D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1F4D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_23AD8.rgba16.ci8.inc.c -g textures/132B50_23AD8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1F6D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_23FD8.rgba16.ci8.inc.c -g textures/132B50_23FD8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1F8D8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_244D8.rgba16.ci8.inc.c -g textures/132B50_244D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1FAD8_tlut_gen.rgba16.bin
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_249D8.rgba16.ci8.inc.c -g textures/132B50_249D8.rgba16.ci8.png -s u8 -w 40 -h 32 -f ci8 -c rgba16 -p textures/132B50_1FCD8_tlut_gen.rgba16.bin
-
-	$(BIN2C) textures/132B50_24ED8_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_24ED8_tlut.rgba16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_25ED8_tlut.rgba16.inc.c -g textures/132B50_25ED8_tlut.rgba16.png -s u8 -w 16 -h 16
-
-	$(BIN2C) textures/132B50_260D8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_260D8.rgba16.ci8
-	$(BIN2C) textures/132B50_26558.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_26558.rgba16.ci8
-	$(BIN2C) textures/132B50_269D8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_269D8.rgba16.ci8
-	$(BIN2C) textures/132B50_26E58.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_26E58.rgba16.ci8
-	$(BIN2C) textures/132B50_272D8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_272D8.rgba16.ci8
-	$(BIN2C) textures/132B50_27758.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_27758.rgba16.ci8
-	$(BIN2C) textures/132B50_27BD8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_27BD8.rgba16.ci8
-	$(BIN2C) textures/132B50_28058.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_28058.rgba16.ci8
-	$(BIN2C) textures/132B50_284D8.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_284D8.rgba16.ci8
-	$(BIN2C) textures/132B50_28958.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_28958.rgba16.ci8
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_28DD8.rgba16.inc.c -g textures/132B50_28DD8.rgba16.png -s u8 -w 32 -h 16
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_291D8.rgba16.inc.c -g textures/132B50_291D8.rgba16.png -s u8 -w 16 -h 16
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_293D8.i4.inc.c -g textures/132B50_293D8.i4.png -s u8 -w 16 -h 16 -f i4
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_29458.i8.inc.c -g textures/132B50_29458.i8.png -s u8 -w 32 -h 32 -f i8
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_29858.rgba16.ci8.inc.c -g textures/132B50_29858.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/132B50_2A858_pal.rgba16.bin
-	$(BIN2C) textures/132B50_29C58.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_29C58.rgba16.ci8
-	$(BIN2C) textures/132B50_2A058.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_2A058.rgba16.ci8
-	$(BIN2C) textures/132B50_2A458.rgba16.ci8.bin $(BUILD_DIR)/textures/132B50_2A458.rgba16.ci8
-
-
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_29C58.rgba16.ci8.inc.c -g textures/132B50_29C58.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/a.rgba16.png
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2A058.rgba16.ci8.inc.c -g textures/132B50_2A058.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/b.rgba16.bin
-#$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2A458.rgba16.ci8.inc.c -g textures/132B50_2A458.rgba16.ci8.png -s u8 -w 32 -h 32 -f ci8 -c rgba16 -p textures/c.rgba16.bin
-
-	$(BIN2C) textures/132B50_2A858_tlut.rgba16.bin $(BUILD_DIR)/textures/132B50_2A858_tlut.rgba16
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2AA58.rgba16.inc.c -g textures/132B50_2AA58.rgba16.png -s u8 -w 16 -h 16
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2AC58.i8.inc.c -g textures/132B50_2AC58.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2B058.i8.inc.c -g textures/132B50_2B058.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2B458.i8.inc.c -g textures/132B50_2B458.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2B858.i8.inc.c -g textures/132B50_2B858.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2BC58.i8.inc.c -g textures/132B50_2BC58.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2C058.i8.inc.c -g textures/132B50_2C058.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2C458.i8.inc.c -g textures/132B50_2C458.i8.png -s u8 -w 32 -h 32 -f i8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2C858.i8.inc.c -g textures/132B50_2C858.i8.png -s u8 -w 32 -h 32 -f i8
-
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CC58.rgba16.inc.c -g textures/132B50_2CC58.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CCD8.rgba16.inc.c -g textures/132B50_2CCD8.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CD58.rgba16.inc.c -g textures/132B50_2CD58.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CDD8.rgba16.inc.c -g textures/132B50_2CDD8.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CE58.rgba16.inc.c -g textures/132B50_2CE58.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CED8.rgba16.inc.c -g textures/132B50_2CED8.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CF58.rgba16.inc.c -g textures/132B50_2CF58.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2CFD8.rgba16.inc.c -g textures/132B50_2CFD8.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2D058.rgba16.inc.c -g textures/132B50_2D058.rgba16.png -s u8 -w 8 -h 8
-	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_2D0D8.rgba16.inc.c -g textures/132B50_2D0D8.rgba16.png -s u8 -w 8 -h 8
-	
+	$(N64GRAPHICS) -i $(BUILD_DIR)/textures/132B50_25ED8_tlut.rgba16.inc.c -g textures/132B50_25ED8_tlut.rgba16.png -s u8
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_260D8.rgba16.ci8.inc.c -g textures/132B50_260D8.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_26558.rgba16.ci8.inc.c -g textures/132B50_26558.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_269D8.rgba16.ci8.inc.c -g textures/132B50_269D8.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_26E58.rgba16.ci8.inc.c -g textures/132B50_26E58.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_272D8.rgba16.ci8.inc.c -g textures/132B50_272D8.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_27758.rgba16.ci8.inc.c -g textures/132B50_27758.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_27BD8.rgba16.ci8.inc.c -g textures/132B50_27BD8.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_28058.rgba16.ci8.inc.c -g textures/132B50_28058.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_284D8.rgba16.ci8.inc.c -g textures/132B50_284D8.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/textures/132B50_28958.rgba16.ci8.inc.c -g textures/132B50_28958.rgba16.ci8.png -s u8 -w 24 -h 48 -f ci8 -c rgba16 -p textures/132B50_25ED8_tlut.rgba16.png
 
 	@$(CC_CHECK) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
 	$(CC) -c $(CFLAGS) -o $@ $<
 	$(PYTHON) tools/set_o32abi_bit.py $@
+
+COURSE_MODEL_TARGETS := $(foreach dir,$(COURSE_DIRS),$(BUILD_DIR)/$(dir)/model.inc.mio0.o)
+COURSE_PACKED_DL := $(foreach dir,$(COURSE_DIRS),$(BUILD_DIR)/$(dir)/packed_dl.inc.bin)
+# COURSE_PACKED_DL_O := $(foreach dir,$(COURSE_DIRS),$(BUILD_DIR)/$(dir)/packed_dl.inc.bin)
+
+
+
+#$(info $(COURSE_PACKED_DL))
+$(COURSE_PACKED_DL):
+	$(LD) -t -e 0 -Ttext=07000000 -Map $(@D)/packed.inc.elf.map -o $(@D)/packed.inc.elf $(@D)/packed.inc.o --no-check-sections
+# Generate header for packed displaylists
+#   $(DLSYMGEN)
+	$(V)$(EXTRACT_DATA_FOR_MIO) $(@D)/packed.inc.elf $(@D)/packed.inc.bin
+	$(DLPACKER) $(@D)/packed.inc.bin $(@D)/packed_dl.inc.bin
+
+# Elf the course data to include symbol addresses then convert to binary and compress to mio0. The mio0 file is converted to an object file so that the linker can link it.
+$(COURSE_MODEL_TARGETS) : $(BUILD_DIR)/%/model.inc.mio0.o : %/model.inc.c $(COURSE_PACKED_DL)
+	$(LD) -t -e 0 -Ttext=0F000000 -Map $(@D)/model.inc.elf.map -o $(@D)/model.inc.elf $(@D)/model.inc.o --no-check-sections
+# Generate model vertice count header
+#	$(MODELSYMGEN)
+	$(V)$(EXTRACT_DATA_FOR_MIO) $(@D)/model.inc.elf $(@D)/model.inc.bin
+	$(MIO0TOOL) -c $(@D)/model.inc.bin $(@D)/model.inc.mio0
+	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"$(@D)/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_$(lastword $(subst /, ,$*))_packed\n\n.incbin \"$(@D)/packed_dl.inc.bin\"\n\n.balign 0x10\n" > $(@D)/model.inc.mio0.s
+	$(AS) $(ASFLAGS) -o $@ $(@D)/model.inc.mio0.s
+
+#################### Compile course vertex to mio0 #####################
+#################### Compile course displaylists to mio0 #####################
+
+COURSE_TEXTURE_FILES := $(foreach dir,textures/courses,$(subst .png, , $(wildcard $(dir)/*)))
+COURSE_TLUT := $(foreach dir,textures/courses/tlut,$(subst .png, , $(wildcard $(dir)/*)))
+COURSE_TLUT2 := $(foreach dir,textures/courses/tlut2,$(subst .png, , $(wildcard $(dir)/*)))
+COURSE_TLUT3 := $(foreach dir,textures/courses/tlut3,$(subst .png, , $(wildcard $(dir)/*)))
+#RAINBOW_ROAD_TEXTURE_FILES := $(foreach dir,textures/courses/rainbow_road,$(subst .png, , $(wildcard $(dir)/*)))
+
+COURSE_DATA_TARGETS := $(foreach dir,$(COURSE_DIRS),$(BUILD_DIR)/$(dir)/course_data.inc.mio0.o)
+COURSE_DATA_TARGETS_O := $(foreach dir,$(COURSE_DIRS),$(BUILD_DIR)/$(dir)/course_data.inc.o)
+
+$(COURSE_TEXTURE_FILES):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8
+
+$(COURSE_TLUT):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8 -c $(lastword $(subst ., ,$(subst .$(lastword $(subst ., ,$(COURSE_TLUT))), ,$(COURSE_TLUT)))) -p $(BUILD_DIR)/$@.tlut.inc.c
+
+$(COURSE_TLUT2):
+	$(N64GRAPHICS) -i $(BUILD_DIR)/$@.inc.c -g $@.png -f $(lastword $(subst ., ,$@)) -s u8 -c $(lastword $(subst ., ,$(subst .$(lastword $(subst ., ,$(COURSE_TLUT2))), ,$(COURSE_TLUT2)))) -p $(BUILD_DIR)/$@.tlut.inc.c -m 0xFFFF
+
+$(COURSE_TLUT3):
+	$(N64GRAPHICS) -Z $(BUILD_DIR)/$@.inc.c -g $@.png -s u8 -c rgba16 -f ci8 -p textures/courses/$(basename $(notdir $@)).png
+#   tluts
+
+$(COURSE_DATA_TARGETS_O): $(BUILD_DIR)/%/course_data.inc.o : %/course_data.inc.c $(COURSE_TEXTURE_FILES) $(COURSE_TLUT) $(COURSE_TLUT2) $(COURSE_TLUT3)
+	@$(CC_CHECK) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
+	$(CC) -c $(CFLAGS) -o $@ $<
+	$(PYTHON) tools/set_o32abi_bit.py $@
+
+$(COURSE_DATA_TARGETS): $(BUILD_DIR)/%/course_data.inc.mio0.o: $(BUILD_DIR)/%/course_data.inc.o
+# todo: Clean this up if possible. Not really worth the time though.
+	$(LD) -t -e 0 -Ttext=06000000 -Map $(@D)/course_data.inc.elf.map -o $(@D)/course_data.inc.elf $(@D)/course_data.inc.o --no-check-sections
+	$(V)$(EXTRACT_DATA_FOR_MIO) $(@D)/course_data.inc.elf $(@D)/course_data.inc.bin
+	$(MIO0TOOL) -c $(@D)/course_data.inc.bin $(@D)/course_data.inc.mio0
+	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"$(@D)/course_data.inc.mio0\"\n\n" > $(@D)/course_data.inc.mio0.s
+	$(AS) $(ASFLAGS) -o $@ $(@D)/course_data.inc.mio0.s
+
 
 $(BUILD_DIR)/%.o: %.c
 	@$(CC_CHECK) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
@@ -510,165 +425,6 @@ ifeq ($(COMPILER),ido)
     $(BUILD_DIR)/src/audio/external.o:  OPT_FLAGS := -O2 -framepointer
 endif
 
-#################### Compile course vertex to mio0 #####################
-
-mushroom_cup := $(BUILD_DIR)/courses/mushroom_cup
-flower_cup := $(BUILD_DIR)/courses/flower_cup
-star_cup := $(BUILD_DIR)/courses/star_cup
-special_cup := $(BUILD_DIR)/courses/special_cup
-battle := $(BUILD_DIR)/courses/battle
-LD_COURSE_VERTEX_DEPENDENCIES :=        \
-     $(mushroom_cup)/luigi_raceway/model.inc.mio0.o $(mushroom_cup)/moo_moo_farm/model.inc.mio0.o \
-	 $(mushroom_cup)/koopa_beach/model.inc.mio0.o $(mushroom_cup)/kalimari_desert/model.inc.mio0.o \
-	 $(flower_cup)/toads_turnpike/model.inc.mio0.o $(flower_cup)/frappe_snowland/model.inc.mio0.o \
-	 $(flower_cup)/choco_mountain/model.inc.mio0.o $(flower_cup)/mario_raceway/model.inc.mio0.o \
-	 $(star_cup)/wario_stadium/model.inc.mio0.o $(star_cup)/sherbet_land/model.inc.mio0.o \
-	 $(star_cup)/royal_raceway/model.inc.mio0.o $(star_cup)/bowsers_castle/model.inc.mio0.o \
-	 $(special_cup)/dks_jungle_parkway/model.inc.mio0.o $(special_cup)/yoshi_valley/model.inc.mio0.o \
-	 $(special_cup)/banshee_boardwalk/model.inc.mio0.o $(special_cup)/rainbow_road/model.inc.mio0.o \
-	 $(battle)/big_donut/model.inc.mio0.o $(battle)/block_fort/model.inc.mio0.o \
-	 $(battle)/double_deck/model.inc.mio0.o $(battle)/skyscraper/model.inc.mio0.o \
-
-$(mushroom_cup)/luigi_raceway/%.inc.mio0.o: courses/mushroom_cup/luigi_raceway/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(mushroom_cup)/luigi_raceway/$*.inc.elf.map -o $(mushroom_cup)/luigi_raceway/$*.inc.elf $(mushroom_cup)/luigi_raceway/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(mushroom_cup)/luigi_raceway/$*.inc.elf $(mushroom_cup)/luigi_raceway/$*.inc.bin
-	$(MIO0TOOL) -c $(mushroom_cup)/luigi_raceway/$*.inc.bin $(mushroom_cup)/luigi_raceway/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/mushroom_cup/luigi_raceway/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_luigi_raceway_packed\n\n.incbin \"bin/course_luigi_raceway_packed.bin\"\n" > build/us/courses/mushroom_cup/luigi_raceway/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(mushroom_cup)/luigi_raceway/$*.inc.mio0.o $(mushroom_cup)/luigi_raceway/$*.inc.mio0.s
-
-$(mushroom_cup)/moo_moo_farm/%.inc.mio0.o: courses/mushroom_cup/moo_moo_farm/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(mushroom_cup)/moo_moo_farm/$*.elf.map -o $(mushroom_cup)/moo_moo_farm/$*.inc.elf $(mushroom_cup)/moo_moo_farm/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(mushroom_cup)/moo_moo_farm/$*.inc.elf $(mushroom_cup)/moo_moo_farm/$*.inc.bin
-	$(MIO0TOOL) -c $(mushroom_cup)/moo_moo_farm/$*.inc.bin $(mushroom_cup)/moo_moo_farm/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/mushroom_cup/moo_moo_farm/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_moo_moo_farm_packed\n\n.incbin \"bin/course_moo_moo_farm_packed.bin\"\n" > build/us/courses/mushroom_cup/moo_moo_farm/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(mushroom_cup)/moo_moo_farm/$*.inc.mio0.o $(mushroom_cup)/moo_moo_farm/$*.inc.mio0.s
-
-$(mushroom_cup)/koopa_beach/%.inc.mio0.o: courses/mushroom_cup/koopa_beach/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(mushroom_cup)/koopa_beach/$*.elf.map -o $(mushroom_cup)/koopa_beach/$*.inc.elf $(mushroom_cup)/koopa_beach/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(mushroom_cup)/koopa_beach/$*.inc.elf $(mushroom_cup)/koopa_beach/$*.inc.bin
-	$(MIO0TOOL) -c $(mushroom_cup)/koopa_beach/$*.inc.bin $(mushroom_cup)/koopa_beach/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/mushroom_cup/koopa_beach/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_koopa_troopa_beach_packed\n\n.incbin \"bin/course_koopa_troopa_beach_packed.bin\"\n" > build/us/courses/mushroom_cup/koopa_beach/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(mushroom_cup)/koopa_beach/$*.inc.mio0.o $(mushroom_cup)/koopa_beach/$*.inc.mio0.s
-
-$(mushroom_cup)/kalimari_desert/%.inc.mio0.o: courses/mushroom_cup/kalimari_desert/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(mushroom_cup)/kalimari_desert/$*.elf.map -o $(mushroom_cup)/kalimari_desert/$*.inc.elf $(mushroom_cup)/kalimari_desert/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(mushroom_cup)/kalimari_desert/$*.inc.elf $(mushroom_cup)/kalimari_desert/$*.inc.bin
-	$(MIO0TOOL) -c $(mushroom_cup)/kalimari_desert/$*.inc.bin $(mushroom_cup)/kalimari_desert/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/mushroom_cup/kalimari_desert/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_kalimari_desert_packed\n\n.incbin \"bin/course_kalimari_desert_packed.bin\"\n" > build/us/courses/mushroom_cup/kalimari_desert/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(mushroom_cup)/kalimari_desert/$*.inc.mio0.o $(mushroom_cup)/kalimari_desert/$*.inc.mio0.s
-
-$(flower_cup)/toads_turnpike/%.inc.mio0.o: courses/flower_cup/toads_turnpike/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(flower_cup)/toads_turnpike/$*.elf.map -o $(flower_cup)/toads_turnpike/$*.inc.elf $(flower_cup)/toads_turnpike/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(flower_cup)/toads_turnpike/$*.inc.elf $(flower_cup)/toads_turnpike/$*.inc.bin
-	$(MIO0TOOL) -c $(flower_cup)/toads_turnpike/$*.inc.bin $(flower_cup)/toads_turnpike/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/flower_cup/toads_turnpike/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_toads_turnpike_packed\n\n.incbin \"bin/course_toads_turnpike_packed.bin\"\n" > build/us/courses/flower_cup/toads_turnpike/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(flower_cup)/toads_turnpike/$*.inc.mio0.o $(flower_cup)/toads_turnpike/$*.inc.mio0.s
-
-$(flower_cup)/frappe_snowland/%.inc.mio0.o: courses/flower_cup/frappe_snowland/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(flower_cup)/frappe_snowland/$*.elf.map -o $(flower_cup)/frappe_snowland/$*.inc.elf $(flower_cup)/frappe_snowland/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(flower_cup)/frappe_snowland/$*.inc.elf $(flower_cup)/frappe_snowland/$*.inc.bin
-	$(MIO0TOOL) -c $(flower_cup)/frappe_snowland/$*.inc.bin $(flower_cup)/frappe_snowland/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/flower_cup/frappe_snowland/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_frappe_snowland_packed\n\n.incbin \"bin/course_frappe_snowland_packed.bin\"\n" > build/us/courses/flower_cup/frappe_snowland/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(flower_cup)/frappe_snowland/$*.inc.mio0.o $(flower_cup)/frappe_snowland/$*.inc.mio0.s
-
-$(flower_cup)/choco_mountain/%.inc.mio0.o: courses/flower_cup/choco_mountain/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(flower_cup)/choco_mountain/$*.elf.map -o $(flower_cup)/choco_mountain/$*.inc.elf $(flower_cup)/choco_mountain/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(flower_cup)/choco_mountain/$*.inc.elf $(flower_cup)/choco_mountain/$*.inc.bin
-	$(MIO0TOOL) -c $(flower_cup)/choco_mountain/$*.inc.bin $(flower_cup)/choco_mountain/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/flower_cup/choco_mountain/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_choco_mountain_packed\n\n.incbin \"bin/course_choco_mountain_packed.bin\"\n" > build/us/courses/flower_cup/choco_mountain/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(flower_cup)/choco_mountain/$*.inc.mio0.o $(flower_cup)/choco_mountain/$*.inc.mio0.s
-
-$(flower_cup)/mario_raceway/%.inc.mio0.o: courses/flower_cup/mario_raceway/model.inc.c 
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(flower_cup)/mario_raceway/model.elf.map -o $(flower_cup)/mario_raceway/model.inc.elf $(flower_cup)/mario_raceway/model.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(flower_cup)/mario_raceway/model.inc.elf $(flower_cup)/mario_raceway/model.inc.bin
-	$(MIO0TOOL) -c $(flower_cup)/mario_raceway/model.inc.bin $(flower_cup)/mario_raceway/model.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/flower_cup/mario_raceway/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_mario_raceway_packed\n\n.incbin \"bin/course_mario_raceway_packed.bin\"\n" > build/us/courses/flower_cup/mario_raceway/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(flower_cup)/mario_raceway/$*.inc.mio0.o $(flower_cup)/mario_raceway/$*.inc.mio0.s
-
-$(star_cup)/wario_stadium/%.inc.mio0.o: courses/star_cup/wario_stadium/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(star_cup)/wario_stadium/$*.elf.map -o $(star_cup)/wario_stadium/$*.inc.elf $(star_cup)/wario_stadium/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(star_cup)/wario_stadium/$*.inc.elf $(star_cup)/wario_stadium/$*.inc.bin
-	$(MIO0TOOL) -c $(star_cup)/wario_stadium/$*.inc.bin $(star_cup)/wario_stadium/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/star_cup/wario_stadium/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_wario_stadium_packed\n\n.incbin \"bin/course_wario_stadium_packed.bin\"\n" > build/us/courses/star_cup/wario_stadium/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(star_cup)/wario_stadium/$*.inc.mio0.o $(star_cup)/wario_stadium/$*.inc.mio0.s
-
-$(star_cup)/sherbet_land/%.inc.mio0.o: courses/star_cup/sherbet_land/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(star_cup)/sherbet_land/$*.elf.map -o $(star_cup)/sherbet_land/$*.inc.elf $(star_cup)/sherbet_land/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(star_cup)/sherbet_land/$*.inc.elf $(star_cup)/sherbet_land/$*.inc.bin
-	$(MIO0TOOL) -c $(star_cup)/sherbet_land/$*.inc.bin $(star_cup)/sherbet_land/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/star_cup/sherbet_land/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_sherbet_land_packed\n\n.incbin \"bin/course_sherbet_land_packed.bin\"\n" > build/us/courses/star_cup/sherbet_land/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(star_cup)/sherbet_land/$*.inc.mio0.o $(star_cup)/sherbet_land/$*.inc.mio0.s
-
-$(star_cup)/royal_raceway/%.inc.mio0.o: courses/star_cup/royal_raceway/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(star_cup)/royal_raceway/$*.elf.map -o $(star_cup)/royal_raceway/$*.inc.elf $(star_cup)/royal_raceway/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(star_cup)/royal_raceway/$*.inc.elf $(star_cup)/royal_raceway/$*.inc.bin
-	$(MIO0TOOL) -c $(star_cup)/royal_raceway/$*.inc.bin $(star_cup)/royal_raceway/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/star_cup/royal_raceway/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_royal_raceway_packed\n\n.incbin \"bin/course_royal_raceway_packed.bin\"\n" > build/us/courses/star_cup/royal_raceway/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(star_cup)/royal_raceway/$*.inc.mio0.o $(star_cup)/royal_raceway/$*.inc.mio0.s
-
-$(star_cup)/bowsers_castle/%.inc.mio0.o: courses/star_cup/bowsers_castle/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(star_cup)/bowsers_castle/$*.elf.map -o $(star_cup)/bowsers_castle/$*.inc.elf $(star_cup)/bowsers_castle/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(star_cup)/bowsers_castle/$*.inc.elf $(star_cup)/bowsers_castle/$*.inc.bin
-	$(MIO0TOOL) -c $(star_cup)/bowsers_castle/$*.inc.bin $(star_cup)/bowsers_castle/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/star_cup/bowsers_castle/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_bowsers_castle_packed\n\n.incbin \"bin/course_bowsers_castle_packed.bin\"\n" > build/us/courses/star_cup/bowsers_castle/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(star_cup)/bowsers_castle/$*.inc.mio0.o $(star_cup)/bowsers_castle/$*.inc.mio0.s
-
-$(special_cup)/dks_jungle_parkway/%.inc.mio0.o: courses/special_cup/dks_jungle_parkway/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(special_cup)/dks_jungle_parkway/$*.elf.map -o $(special_cup)/dks_jungle_parkway/$*.inc.elf $(special_cup)/dks_jungle_parkway/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(special_cup)/dks_jungle_parkway/$*.inc.elf $(special_cup)/dks_jungle_parkway/$*.inc.bin
-	$(MIO0TOOL) -c $(special_cup)/dks_jungle_parkway/$*.inc.bin $(special_cup)/dks_jungle_parkway/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/special_cup/dks_jungle_parkway/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_dks_jungle_parkway_packed\n\n.incbin \"bin/course_dks_jungle_parkway_packed.bin\"\n" > build/us/courses/special_cup/dks_jungle_parkway/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(special_cup)/dks_jungle_parkway/$*.inc.mio0.o $(special_cup)/dks_jungle_parkway/$*.inc.mio0.s
-
-$(special_cup)/yoshi_valley/%.inc.mio0.o: courses/special_cup/yoshi_valley/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(special_cup)/yoshi_valley/$*.elf.map -o $(special_cup)/yoshi_valley/$*.inc.elf $(special_cup)/yoshi_valley/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(special_cup)/yoshi_valley/$*.inc.elf $(special_cup)/yoshi_valley/$*.inc.bin
-	$(MIO0TOOL) -c $(special_cup)/yoshi_valley/$*.inc.bin $(special_cup)/yoshi_valley/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/special_cup/yoshi_valley/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_yoshi_valley_packed\n\n.incbin \"bin/course_yoshi_valley_packed.bin\"\n" > build/us/courses/special_cup/yoshi_valley/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(special_cup)/yoshi_valley/$*.inc.mio0.o $(special_cup)/yoshi_valley/$*.inc.mio0.s
-
-$(special_cup)/banshee_boardwalk/%.inc.mio0.o: courses/special_cup/banshee_boardwalk/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(special_cup)/banshee_boardwalk/$*.elf.map -o $(special_cup)/banshee_boardwalk/$*.inc.elf $(special_cup)/banshee_boardwalk/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(special_cup)/banshee_boardwalk/$*.inc.elf $(special_cup)/banshee_boardwalk/$*.inc.bin
-	$(MIO0TOOL) -c $(special_cup)/banshee_boardwalk/$*.inc.bin $(special_cup)/banshee_boardwalk/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/special_cup/banshee_boardwalk/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_banshee_boardwalk_packed\n\n.incbin \"bin/course_banshee_boardwalk_packed.bin\"\n" > build/us/courses/special_cup/banshee_boardwalk/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(special_cup)/banshee_boardwalk/$*.inc.mio0.o $(special_cup)/banshee_boardwalk/$*.inc.mio0.s
-
-$(special_cup)/rainbow_road/%.inc.mio0.o: courses/special_cup/rainbow_road/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(special_cup)/rainbow_road/$*.elf.map -o $(special_cup)/rainbow_road/$*.inc.elf $(special_cup)/rainbow_road/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(special_cup)/rainbow_road/$*.inc.elf $(special_cup)/rainbow_road/$*.inc.bin
-	$(MIO0TOOL) -c $(special_cup)/rainbow_road/$*.inc.bin $(special_cup)/rainbow_road/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/special_cup/rainbow_road/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_rainbow_road_packed\n\n.incbin \"bin/course_rainbow_road_packed.bin\"\n" > build/us/courses/special_cup/rainbow_road/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(special_cup)/rainbow_road/$*.inc.mio0.o $(special_cup)/rainbow_road/$*.inc.mio0.s
-
-$(battle)/big_donut/%.inc.mio0.o: courses/battle/big_donut/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(battle)/big_donut/$*.elf.map -o $(battle)/big_donut/$*.inc.elf $(battle)/big_donut/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(battle)/big_donut/$*.inc.elf $(battle)/big_donut/$*.inc.bin
-	$(MIO0TOOL) -c $(battle)/big_donut/$*.inc.bin $(battle)/big_donut/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/battle/big_donut/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_big_donut_packed\n\n.incbin \"bin/course_big_donut_packed.bin\"\n" > build/us/courses/battle/big_donut/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(battle)/big_donut/$*.inc.mio0.o $(battle)/big_donut/$*.inc.mio0.s
-
-$(battle)/block_fort/%.inc.mio0.o: courses/battle/block_fort/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(battle)/block_fort/$*.elf.map -o $(battle)/block_fort/$*.inc.elf $(battle)/block_fort/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(battle)/block_fort/$*.inc.elf $(battle)/block_fort/$*.inc.bin
-	$(MIO0TOOL) -c $(battle)/block_fort/$*.inc.bin $(battle)/block_fort/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/battle/block_fort/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_block_fort_packed\n\n.incbin \"bin/course_block_fort_packed.bin\"\n" > build/us/courses/battle/block_fort/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(battle)/block_fort/$*.inc.mio0.o $(battle)/block_fort/$*.inc.mio0.s
-
-$(battle)/double_deck/%.inc.mio0.o: courses/battle/double_deck/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(battle)/double_deck/$*.elf.map -o $(battle)/double_deck/$*.inc.elf $(battle)/double_deck/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(battle)/double_deck/$*.inc.elf $(battle)/double_deck/$*.inc.bin
-	$(MIO0TOOL) -c $(battle)/double_deck/$*.inc.bin $(battle)/double_deck/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/battle/double_deck/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_double_deck_packed\n\n.incbin \"bin/course_double_deck_packed.bin\"\n" > build/us/courses/battle/double_deck/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(battle)/double_deck/$*.inc.mio0.o $(battle)/double_deck/$*.inc.mio0.s
-
-$(battle)/skyscraper/%.inc.mio0.o: courses/battle/skyscraper/%.inc.c
-	$(LD) -t -e 0 -Ttext=0F000000 -Map $(battle)/skyscraper/$*.elf.map -o $(battle)/skyscraper/$*.inc.elf $(battle)/skyscraper/$*.inc.o --no-check-sections
-	$(V)$(EXTRACT_DATA_FOR_MIO) $(battle)/skyscraper/$*.inc.elf $(battle)/skyscraper/$*.inc.bin
-	$(MIO0TOOL) -c $(battle)/skyscraper/$*.inc.bin $(battle)/skyscraper/$*.inc.mio0
-	printf ".include \"macros.inc\"\n\n.section .data\n\n.balign 4\n\n.incbin \"build/us/courses/battle/skyscraper/model.inc.mio0\"\n\n.balign 4\n\nglabel d_course_skyscraper_packed\n\n.incbin \"bin/course_skyscraper_packed.bin\"\n" > build/us/courses/battle/skyscraper/model.inc.mio0.s
-	$(AS) $(ASFLAGS) -o $(battle)/skyscraper/$*.inc.mio0.o $(battle)/skyscraper/$*.inc.mio0.s
-
 ####################       STAFF GHOSTS        #####################
 
 # trophy_model.inc.c
@@ -698,7 +454,7 @@ $(BUILD_DIR)/src/common_textures.inc.mio0.o: $(BUILD_DIR)/src/common_textures.in
 	$(AS) $(ASFLAGS) -o $(BUILD_DIR)/src/common_textures.inc.mio0.o $(BUILD_DIR)/src/common_textures.inc.mio0.s
 
 
-$(BUILD_DIR)/$(TARGET).elf: $(O_FILES) $(COURSE_MIO0_OBJ_FILES) $(BUILD_DIR)/$(LD_SCRIPT) $(BUILD_DIR)/src/startup_logo.inc.mio0.o $(BUILD_DIR)/src/trophy_model.inc.mio0.o $(BUILD_DIR)/src/common_textures.inc.mio0.o $(LD_COURSE_VERTEX_DEPENDENCIES) undefined_syms.txt
+$(BUILD_DIR)/$(TARGET).elf: $(COURSE_DATA_TARGETS) $(O_FILES) $(COURSE_MIO0_OBJ_FILES) $(BUILD_DIR)/$(LD_SCRIPT) $(BUILD_DIR)/src/startup_logo.inc.mio0.o $(BUILD_DIR)/src/trophy_model.inc.mio0.o $(BUILD_DIR)/src/common_textures.inc.mio0.o $(COURSE_MODEL_TARGETS) undefined_syms.txt
 	$(LD) $(LDFLAGS) -o $@
 
 $(BUILD_DIR)/$(TARGET).z64: $(BUILD_DIR)/$(TARGET).elf
@@ -717,7 +473,7 @@ test: $(TARGET).z64
 load: $(TARGET).z64
 	$(LOADER) $(LOADER_FLAGS) $<
 
-.PHONY: all clean distclean default diff test load
+.PHONY: all clean distclean distclean_assets default diff test load
 .SECONDARY:
 
 # Remove built-in rules, to improve  build/us/courses/star_cup/bowsers_castle/model.inc.mio0.performance

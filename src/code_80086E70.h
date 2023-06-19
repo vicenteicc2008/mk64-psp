@@ -77,7 +77,7 @@ s32  func_8008A0B4(s32, Player*, Camera*, u16);
 s32  func_8008A140(s32, Camera*, u16);
 void func_8008A1D0(s32, s32, s32, s32);
 void func_8008A2CC(s32, s32, u16);
-u32  func_8008A364(s32, s32, u16, s32);
+s32  func_8008A364(s32, s32, u16, s32);
 void func_8008A454(s32, s32, s32);
 void func_8008A4CC(s32);
 void func_8008A610(s32);
@@ -137,6 +137,8 @@ extern s32 D_80183DA8;
 extern s32 D_80183DC8;
 extern f32 gVBlankTimer;
 extern UnkActorInner D_8018C3B0;
+extern Player *gPlayerOne;
 extern Player *gPlayerOneCopy;
+extern s16 gCurrentCourseId;
 
 #endif

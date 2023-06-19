@@ -148,11 +148,17 @@ typedef struct {
 // This struct is almost identical to the GBI Vtx_t type,
 // except that its missing the "flag" member.
 typedef struct {
-    s16        ob[3];    /* x, y, z */
-    s16        tc[2];    /* texture coord */
-    u8    ca[4];    /* color & alpha */
+    s16 ob[3];    /* x, y, z */
+    s16 tc[2];    /* texture coord */
+    u8  ca[4];    /* color & alpha */
 
 } mk64_Vtx;
+
+typedef struct {
+    s16 ob[3];    /* x, y, z */
+    s16 tc[2];    /* texture coord */
+    s8  n[3];    /* color & alpha */
+} mk64_Vtx_n;
 
 /*
 This struct has been copied (with only minor modifications) from
@@ -291,7 +297,7 @@ typedef struct {
     /* 0x010C */ s16 unk_10C;
     /* 0x010E */ char unk_10E[0x2];
     /* 0x0110 */ UnkActorInner unk_110;
-    /* 0x0150 */ f32 unk_150[9];
+    /* 0x0150 */ Mat3 unk_150;
     /* 0x0174 */ Mat3 unk_174;
     /* 0x0198 */ KartBoundingBoxCorner boundingBoxCorners[4];
     /* 0x01F8 */ f32 unk_1F8;
@@ -510,7 +516,8 @@ typedef struct {
     /* 0x73 */ s8 blinkState;
     /* 0x74 */ s8 unk_74;
     /* 0x75 */ s8 unk_75;
-    /* 0x76 */ s16 itemOverride; // Something related to item generation. If non-zero, it determines the item you get
+    /* 0x76 */ u8 itemOverride; // Something related to item generation. If non-zero, it determines the item you get
+    /* 0x77 */ s8 unk_77;
     // 0x78 to 0x7F appear to be some type of "state" trackers for the lap and timer text during a race start
     // When a race starts those texts (and their afterimages) slide in and "bounce" a bit. These states control the bouncing (somehow)
     /* 0x78 */ s8 unk_78;

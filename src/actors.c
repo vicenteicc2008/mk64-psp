@@ -15,8 +15,10 @@
 #include "code_80005FD0.h"
 #include "code_80071F00.h"
 #include "code_8008C1D0.h"
+#include "code_802AAA70.h"
 #include <sounds.h>
 #include "audio/external.h"
+#include "common_textures.h"
 
 s32 D_802BA050;
 s32 D_802BA054;
@@ -98,7 +100,8 @@ void func_80296A50(struct ShellActor *shell) {
     }
 }
 
-void func_80296D10(struct Actor *actor, Vec3f startingPos, Vec3s startingRot, Vec3f startingVelocity, s16 actorType) {
+// Sets introductory values for a new actor (ex. Banana).
+void actor_init(struct Actor *actor, Vec3f startingPos, Vec3s startingRot, Vec3f startingVelocity, s16 actorType) {
     vec3f_copy(actor->pos, startingPos);
     vec3s_copy(actor->rot, startingRot);
     vec3f_copy(actor->velocity, startingVelocity);
@@ -374,7 +377,7 @@ void func_802977E4(Player *arg0) {
 
 void func_80297818(void) {
     s16 *phi_v0 = &D_802BA060[0];
-    s16 *phi_v1 = VIRTUAL_TO_PHYSICAL2(gSegmentTable[SEGMENT_NUMBER2(&D_0D004E38)] + SEGMENT_OFFSET(&D_0D004E38));
+    s16 *phi_v1 = VIRTUAL_TO_PHYSICAL2(gSegmentTable[SEGMENT_NUMBER2(gTLUTGreenShell)] + SEGMENT_OFFSET(gTLUTGreenShell));
     s16 temp_a0, temp_a0_2, temp_a0_3, temp_a0_4, temp_a0_5;
     s32 i;
     for (i = 0; i < 256; i++) {
@@ -1253,7 +1256,7 @@ UNUSED s16 D_802B8810[] = {
 };
 
 void func_8029A690(Camera *arg0, Mat4 arg1, struct ShellActor *arg2) {
-    gDPLoadTLUT_pal256(gDisplayListHead++, &D_0D004E38);
+    gDPLoadTLUT_pal256(gDisplayListHead++, gTLUTGreenShell);
     func_8029A3AC(arg0, arg1, arg2);
 }
 
@@ -1264,7 +1267,7 @@ void func_8029A75C(Camera *arg0, Mat4 arg1, struct ShellActor *arg2) {
 
 // Middle of a tlut access
 void func_8029A828(Camera *arg0, Mat4 arg1, struct ShellActor *arg2) {
-    gDPLoadTLUT_pal256(gDisplayListHead++, &D_0D004E68[0x1D0]);
+    gDPLoadTLUT_pal256(gDisplayListHead++, gTLUTBlueShell);
     func_8029A3AC(arg0, arg1, arg2);
 }
 
@@ -1392,6 +1395,7 @@ UNUSED void func_8029AE14() {
 
 }
 
+// This likely attaches the paddle wheel to the boat
 void func_8029AE1C(Camera *arg0, struct PaddleWheelBoat *boat, Mat4 arg2, u16 arg3) {
     s32 pad[3];
     Vec3f sp120;
@@ -1565,6 +1569,7 @@ void func_8029B6EC(Camera *camera, struct Actor* arg1) {
     }
 }
 
+// Spins train wheels?
 void func_8029B8E8(Camera *camera, struct TrainCar *actor) {
     s32 pad[3];
     Vec3f sp160;
@@ -1879,26 +1884,28 @@ void func_8029CA90(Camera *camera, struct FallingRock *rock) {
 
     if (temp_f0 < 0.0f) { return; }
 
-    if ((temp_f0 < 250000.0f) && (rock->unk30.unk34 == 1)) {
-        sp8C[0] = rock->pos[0];
-        sp8C[2] = rock->pos[2];
-        temp_f0 = func_802ABE30(sp8C[0], rock->pos[1], sp8C[2], rock->unk30.unk3A);
-        sp98[0] = 0;
-        sp98[1] = 0;
-        sp98[2] = 0;
-        sp8C[1] = temp_f0 + 2.0f;
-        func_802B5F74(sp4C, sp8C, sp98);
-        if (func_802B4FF8(sp4C, 0) != 0) {
+    if (temp_f0 < 250000.0f) {
+    
+        if (rock->unk30.unk34 == 1) {
+            sp8C[0] = rock->pos[0];
+            sp8C[2] = rock->pos[2];
+            temp_f0 = func_802ABE30(sp8C[0], rock->pos[1], sp8C[2], rock->unk30.unk3A);
+            sp98[0] = 0;
+            sp98[1] = 0;
+            sp98[2] = 0;
+            sp8C[1] = temp_f0 + 2.0f;
+            func_802B5F74(sp4C, sp8C, sp98);
+            if (func_802B4FF8(sp4C, 0) == 0) {
+                return;
+            }
             gSPDisplayList(gDisplayListHead++, D_06006F88);
-            goto block_6;
-        }
-    } else {
-block_6:
-        func_802B5F74(sp4C, rock->pos, rock->rot);
-        if (func_802B4FF8(sp4C, 0) != 0) {
-            gSPDisplayList(gDisplayListHead++, D_06006FE0);
         }
     }
+    func_802B5F74(sp4C, rock->pos, rock->rot);
+    if (func_802B4FF8(sp4C, 0) == 0) {
+        return;
+    }
+    gSPDisplayList(gDisplayListHead++, D_06006FE0);
 }
 
 void place_piranha_plants(struct ActorSpawnData *spawnData) {
@@ -1919,7 +1926,7 @@ void place_piranha_plants(struct ActorSpawnData *spawnData) {
         startingPos[0] = temp_s0->pos[0] * gCourseDirection;
         startingPos[1] = temp_s0->pos[1];
         startingPos[2] = temp_s0->pos[2];
-        temp = func_8029EC88(startingPos, startingRot, startingVelocity, ACTOR_PIRANHA_PLANT);
+        temp = addActorToEmptySlot(startingPos, startingRot, startingVelocity, ACTOR_PIRANHA_PLANT);
         temp_v1 = (struct PiranhaPlant *) &gActorList[temp];
         temp_v1->visibilityStates[0] = 0;
         temp_v1->visibilityStates[1] = 0;
@@ -1950,7 +1957,7 @@ void place_palm_trees(struct ActorSpawnData *spawnData) {
         startingPos[0] = temp_s0->pos[0] * gCourseDirection;
         startingPos[1] = temp_s0->pos[1];
         startingPos[2] = temp_s0->pos[2];
-        temp = func_8029EC88(startingPos, startingRot, startingVelocity, ACTOR_PALM_TREE);
+        temp = addActorToEmptySlot(startingPos, startingRot, startingVelocity, ACTOR_PALM_TREE);
         temp_v1 = (struct PalmTree *) &gActorList[temp];
 
         temp_v1->visibilityStates[0] = temp_s0->someId;
@@ -1990,7 +1997,7 @@ void place_falling_rocks(struct ActorSpawnData *spawnData) {
         startingPos[2] = temp_s0->pos[2];
         vec3f_set(startingVelocity, 0, 0, 0);
         vec3s_set(startingRot, 0, 0, 0);
-        temp = func_8029EC88(startingPos, startingRot, startingVelocity, ACTOR_FALLING_ROCK);
+        temp = addActorToEmptySlot(startingPos, startingRot, startingVelocity, ACTOR_FALLING_ROCK);
         temp_v1 = (struct FallingRock *) &gActorList[temp];
 
         temp_v1->unk_06 = temp_s0->someId;
@@ -2143,7 +2150,7 @@ void place_segment_06(struct ActorSpawnData *arg0) {
             break;
         }
 
-        temp_s0 = &gActorList[func_8029EC88(position, rotation, velocity, actorType)];
+        temp_s0 = &gActorList[addActorToEmptySlot(position, rotation, velocity, actorType)];
         if (gGamestate == CREDITS_SEQUENCE) {
             func_802976D8(temp_s0->rot);
         } else {
@@ -2166,24 +2173,25 @@ void place_all_item_boxes(struct ActorSpawnData *spawnData) {
     Vec3f startingVelocity;
     Vec3s startingRot;
 
-    if ((gModeSelection != TIME_TRIALS) && (gPlaceItemBoxes != 0)) {
-        vec3f_set(startingVelocity, 0, 0, 0);
-        while(temp_s0->pos[0] != -0x8000) {
-            startingPos[0] = temp_s0->pos[0] * gCourseDirection;
-            startingPos[1] = temp_s0->pos[1];
-            startingPos[2] = temp_s0->pos[2];
-            startingRot[0] = random_u16();
-            startingRot[1] = random_u16();
-            startingRot[2] = random_u16();
-            temp_s1 = func_8029EC88(startingPos, startingRot, startingVelocity, ACTOR_ITEM_BOX);
-            temp_f0 = func_802AE1C0(startingPos[0], startingPos[1] + 10.0f, startingPos[2]);
-            temp_v0 = (struct ItemBox *) &gActorList[temp_s1];
-            temp_v0->resetDistance = temp_f0;
-            temp_v0->origY = startingPos[1];
-            temp_v0->pos[1] = temp_f0 - 20.0f;
-            temp_s0++;
-        }
+    if ((gModeSelection == TIME_TRIALS) || (gPlaceItemBoxes == 0)) { return; }
+
+    vec3f_set(startingVelocity, 0, 0, 0);
+    while(temp_s0->pos[0] != -0x8000) {
+        startingPos[0] = temp_s0->pos[0] * gCourseDirection;
+        startingPos[1] = temp_s0->pos[1];
+        startingPos[2] = temp_s0->pos[2];
+        startingRot[0] = random_u16();
+        startingRot[1] = random_u16();
+        startingRot[2] = random_u16();
+        temp_s1 = addActorToEmptySlot(startingPos, startingRot, startingVelocity, ACTOR_ITEM_BOX);
+        temp_f0 = func_802AE1C0(startingPos[0], startingPos[1] + 10.0f, startingPos[2]);
+        temp_v0 = (struct ItemBox *) &gActorList[temp_s1];
+        temp_v0->resetDistance = temp_f0;
+        temp_v0->origY = startingPos[1];
+        temp_v0->pos[1] = temp_f0 - 20.0f;
+        temp_s0++;
     }
+    
 }
 
 void init_kiwano_fruit(void) {
@@ -2202,7 +2210,7 @@ void init_kiwano_fruit(void) {
         if ((phi_s1->unk_000 & 0x4000) == 0) { continue; }
         if ((phi_s1->unk_000 & 0x100) != 0) { continue; }
 
-        phi_s0 = func_8029EC88(sp64, sp50, sp58, ACTOR_KIWANO_FRUIT);
+        phi_s0 = addActorToEmptySlot(sp64, sp50, sp58, ACTOR_KIWANO_FRUIT);
         actor = &gActorList[phi_s0];
         actor->unk_04 = i;
     }
@@ -2226,7 +2234,7 @@ void destroy_all_actors(void) {
     }
 }
 
-void func_8029DB44(void) {
+void place_course_actors(void) {
     s32 stackPadding0;
     Vec3f position;
     Vec3f velocity = { 0.0f, 0.0f, 0.0f };
@@ -2242,10 +2250,10 @@ void func_8029DB44(void) {
         place_all_item_boxes(D_06009498);
         vec3f_set(position, 150.0f, 40.0f, -1300.0f);
         position[0] *= gCourseDirection;
-        func_8029EC88(position, rotation, velocity, ACTOR_MARIO_RACEWAY_SIGN);
+        addActorToEmptySlot(position, rotation, velocity, ACTOR_MARIO_RACEWAY_SIGN);
         vec3f_set(position, 2520.0f, 0.0f, 1240.0f);
         position[0] *= gCourseDirection;
-        actor = &gActorList[func_8029EC88(position, rotation, velocity, ACTOR_MARIO_RACEWAY_SIGN)];
+        actor = &gActorList[addActorToEmptySlot(position, rotation, velocity, ACTOR_MARIO_RACEWAY_SIGN)];
         actor->flags |= 0x4000;
         break;
     case COURSE_CHOCO_MOUNTAIN:
@@ -2264,7 +2272,7 @@ void func_8029DB44(void) {
         place_all_item_boxes(D_06018110);
         vec3f_set(position, -2300.0f, 0.0f, 634.0f);
         position[0] *= gCourseDirection;
-        func_8029EC88(position, rotation, velocity, ACTOR_YOSHI_VALLEY_EGG);
+        addActorToEmptySlot(position, rotation, velocity, ACTOR_YOSHI_VALLEY_EGG);
         break;
     case COURSE_FRAPPE_SNOWLAND:
         place_segment_06(D_06007718);
@@ -2298,20 +2306,20 @@ void func_8029DB44(void) {
         place_all_item_boxes(D_06022E88);
         vec3f_set(position, -1680.0f, 2.0f, 35.0f);
         position[0] *= gCourseDirection;
-        rrxing = (struct RailroadCrossing *)&gActorList[func_8029EC88(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
+        rrxing = (struct RailroadCrossing *)&gActorList[addActorToEmptySlot(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
         rrxing->crossingId = 1;
         vec3f_set(position, -1600.0f, 2.0f, 35.0f);
         position[0] *= gCourseDirection;
-        rrxing = (struct RailroadCrossing *)&gActorList[func_8029EC88(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
+        rrxing = (struct RailroadCrossing *)&gActorList[addActorToEmptySlot(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
         rrxing->crossingId = 1;
         vec3s_set(rotation, 0, -0x2000, 0);
         vec3f_set(position, -2459.0f, 2.0f, 2263.0f);
         position[0] *= gCourseDirection;
-        rrxing = (struct RailroadCrossing *)&gActorList[func_8029EC88(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
+        rrxing = (struct RailroadCrossing *)&gActorList[addActorToEmptySlot(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
         rrxing->crossingId = 0;
         vec3f_set(position, -2467.0f, 2.0f, 2375.0f);
         position[0] *= gCourseDirection;
-        rrxing = (struct RailroadCrossing *)&gActorList[func_8029EC88(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
+        rrxing = (struct RailroadCrossing *)&gActorList[addActorToEmptySlot(position, rotation, velocity, ACTOR_RAILROAD_CROSSING)];
         rrxing->crossingId = 0;
         break;
     case COURSE_SHERBET_LAND:
@@ -2324,13 +2332,13 @@ void func_8029DB44(void) {
         place_all_item_boxes(D_0600CB40);
         vec3f_set(position, -131.0f, 83.0f, 286.0f);
         position[0] *= gCourseDirection;
-        func_8029EC88(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
+        addActorToEmptySlot(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
         vec3f_set(position, -2353.0f, 72.0f, -1608.0f);
         position[0] *= gCourseDirection;
-        func_8029EC88(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
+        addActorToEmptySlot(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
         vec3f_set(position, -2622.0f, 79.0f, 739.0f);
         position[0] *= gCourseDirection;
-        func_8029EC88(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
+        addActorToEmptySlot(position, rotation, velocity, ACTOR_WARIO_STADIUM_SIGN);
         break;
     case COURSE_BLOCK_FORT:
         place_all_item_boxes(D_06000038);
@@ -2354,103 +2362,103 @@ void func_8029DB44(void) {
 }
 
 void func_8029E158(void) {
-    set_segment_base_addr(3, gPrevLoadedAddress);
-    D_802BA050 = func_802A84F4(D_0F04CBE0, 0x00000257U, 0x00000400U);
-    func_802A84F4(D_0F04CE30, 0x00000242U, 0x00000400U);
-    func_802A84F4(D_0F04D080, 0x00000259U, 0x00000400U);
-    func_802A84F4(D_0F04D2D8, 0x00000256U, 0x00000400U);
-    func_802A84F4(D_0F04D538, 0x00000246U, 0x00000400U);
-    func_802A84F4(D_0F04D790, 0x0000025EU, 0x00000400U);
-    func_802A84F4(D_0F04D9FC, 0x0000025CU, 0x00000400U);
-    func_802A84F4(D_0F04DC5C, 0x00000254U, 0x00000400U);
-    D_802BA054 = func_802A84F4(D_0F04DEB0, 0x0000022AU, 0x00000400U);
-    func_802A84F4(D_0F04E0DC, 0x00000237U, 0x00000400U);
-    func_802A84F4(D_0F04E314, 0x0000023EU, 0x00000400U);
-    func_802A84F4(D_0F04E554, 0x00000243U, 0x00000400U);
-    func_802A84F4(D_0F04E798, 0x00000255U, 0x00000400U);
-    func_802A84F4(D_0F04E9F0, 0x00000259U, 0x00000400U);
-    func_802A84F4(D_0F04EC4C, 0x00000239U, 0x00000400U);
-    func_802A84F4(D_0F04EE88, 0x00000236U, 0x00000400U);
-    func_802A84F4(D_0F054C3C, 0x0000028EU, 0x00000800U);
-    func_802A84F4(D_0F054ECC, 0x000002FBU, 0x00000800U);
-    func_802A84F4(D_0F0551C8, 0x00000302U, 0x00000800U);
-    func_802A84F4(D_0F0554CC, 0x000003B4U, 0x00000800U);
-    func_802A84F4(D_0F055880, 0x0000031EU, 0x00000800U);
-    func_802A84F4(D_0F055BA0, 0x0000036EU, 0x00000800U);
-    func_802A84F4(D_0F055F10, 0x0000029CU, 0x00000800U);
-    func_802A84F4(D_0F0561AC, 0x0000025BU, 0x00000800U);
-    func_802A84F4(gTexture671A88, 0x00000400U, 0x00000800U);
-    func_802A84F4(gTexture6774D8, 0x00000400U, 0x00000800U);
+    set_segment_base_addr(3, (void *) gNextFreeMemoryAddress);
+    D_802BA050 = dma_textures(D_0F04CBE0, 0x00000257U, 0x00000400U);
+    dma_textures(D_0F04CE30, 0x00000242U, 0x00000400U);
+    dma_textures(D_0F04D080, 0x00000259U, 0x00000400U);
+    dma_textures(D_0F04D2D8, 0x00000256U, 0x00000400U);
+    dma_textures(D_0F04D538, 0x00000246U, 0x00000400U);
+    dma_textures(D_0F04D790, 0x0000025EU, 0x00000400U);
+    dma_textures(D_0F04D9FC, 0x0000025CU, 0x00000400U);
+    dma_textures(D_0F04DC5C, 0x00000254U, 0x00000400U);
+    D_802BA054 = dma_textures(D_0F04DEB0, 0x0000022AU, 0x00000400U);
+    dma_textures(D_0F04E0DC, 0x00000237U, 0x00000400U);
+    dma_textures(D_0F04E314, 0x0000023EU, 0x00000400U);
+    dma_textures(D_0F04E554, 0x00000243U, 0x00000400U);
+    dma_textures(D_0F04E798, 0x00000255U, 0x00000400U);
+    dma_textures(D_0F04E9F0, 0x00000259U, 0x00000400U);
+    dma_textures(D_0F04EC4C, 0x00000239U, 0x00000400U);
+    dma_textures(D_0F04EE88, 0x00000236U, 0x00000400U);
+    dma_textures(D_0F054C3C, 0x0000028EU, 0x00000800U);
+    dma_textures(D_0F054ECC, 0x000002FBU, 0x00000800U);
+    dma_textures(D_0F0551C8, 0x00000302U, 0x00000800U);
+    dma_textures(D_0F0554CC, 0x000003B4U, 0x00000800U);
+    dma_textures(D_0F055880, 0x0000031EU, 0x00000800U);
+    dma_textures(D_0F055BA0, 0x0000036EU, 0x00000800U);
+    dma_textures(D_0F055F10, 0x0000029CU, 0x00000800U);
+    dma_textures(D_0F0561AC, 0x0000025BU, 0x00000800U);
+    dma_textures(gTexture671A88, 0x00000400U, 0x00000800U);
+    dma_textures(gTexture6774D8, 0x00000400U, 0x00000800U);
     switch (gCurrentCourseId) {
-    case 0:
-        func_802A84F4(D_0F04F45C, 0x0000035BU, 0x00000800U);
-        D_802BA058 = func_802A84F4(D_0F056408, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F05662C, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F05688C, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056AD0, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056CF0, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056EC8, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057084, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057288, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057590, 0x000003E8U, 0x00000800U);
+    case COURSE_MARIO_RACEWAY:
+        dma_textures(D_0F04F45C, 0x0000035BU, 0x00000800U);
+        D_802BA058 = dma_textures(D_0F056408, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F05662C, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F05688C, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056AD0, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056CF0, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056EC8, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057084, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057288, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057590, 0x000003E8U, 0x00000800U);
         break;
-    case 2:
-        func_802A84F4(gTextureShrub, 0x000003FFU, 0x00000800U);
+    case COURSE_BOWSER_CASTLE:
+        dma_textures(gTextureShrub, 0x000003FFU, 0x00000800U);
         break;
-    case 4:
-        func_802A84F4(D_0F04F7A4, 0x000003E8U, 0x00000800U);
+    case COURSE_YOSHI_VALLEY:
+        dma_textures(D_0F04F7A4, 0x000003E8U, 0x00000800U);
         break;
-    case 5:
-        func_802A84F4(D_0F0513CC, 0x00000454U, 0x00000800U);
-        func_802A84F4(D_0F051820, 0x00000432U, 0x00000800U);
+    case COURSE_FRAPPE_SNOWLAND:
+        dma_textures(D_0F0513CC, 0x00000454U, 0x00000800U);
+        dma_textures(D_0F051820, 0x00000432U, 0x00000800U);
         break;
-    case 7:
-        func_802A84F4(D_0F04FB3C, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F050D50, 0x000003E8U, 0x00000800U);
-        D_802BA058 = func_802A84F4(D_0F056408, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F05662C, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F05688C, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056AD0, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056CF0, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F056EC8, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057084, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057288, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F057590, 0x000003E8U, 0x00000800U);
+    case COURSE_ROYAL_RACEWAY:
+        dma_textures(D_0F04FB3C, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F050D50, 0x000003E8U, 0x00000800U);
+        D_802BA058 = dma_textures(D_0F056408, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F05662C, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F05688C, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056AD0, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056CF0, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F056EC8, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057084, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057288, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F057590, 0x000003E8U, 0x00000800U);
         break;
-    case 8:
-        func_802A84F4(D_0F050468, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F050678, 0x000003E8U, 0x00000800U);
+    case COURSE_LUIGI_RACEWAY:
+        dma_textures(D_0F050468, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F050678, 0x000003E8U, 0x00000800U);
         break;
-    case 9:
-        func_802A84F4(D_0F04FE28, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F050118, 0x000003E8U, 0x00000800U);
-        func_802A84F4(D_0F051C54, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F051FD8, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F05232C, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F0526B8, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F052A20, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F052D3C, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F05300C, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F0532F8, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F05363C, 0x00000400U, 0x00000800U);
-        func_802A84F4(D_0F053950, 0x00000400U, 0x00000800U);
+    case COURSE_MOO_MOO_FARM:
+        dma_textures(D_0F04FE28, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F050118, 0x000003E8U, 0x00000800U);
+        dma_textures(D_0F051C54, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F051FD8, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F05232C, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F0526B8, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F052A20, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F052D3C, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F05300C, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F0532F8, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F05363C, 0x00000400U, 0x00000800U);
+        dma_textures(D_0F053950, 0x00000400U, 0x00000800U);
         break;
-    case 11:
-        func_802A84F4(D_0F053C34, 0x0000033EU, 0x00000800U);
-        func_802A84F4(D_0F053F74, 0x000002FBU, 0x00000800U);
-        func_802A84F4(D_0F054270, 0x000002A8U, 0x00000800U);
-        func_802A84F4(D_0F054518, 0x00000374U, 0x00000800U);
-        func_802A84F4(D_0F05488C, 0x000003AFU, 0x00000800U);
+    case COURSE_KALAMARI_DESERT:
+        dma_textures(D_0F053C34, 0x0000033EU, 0x00000800U);
+        dma_textures(D_0F053F74, 0x000002FBU, 0x00000800U);
+        dma_textures(D_0F054270, 0x000002A8U, 0x00000800U);
+        dma_textures(D_0F054518, 0x00000374U, 0x00000800U);
+        dma_textures(D_0F05488C, 0x000003AFU, 0x00000800U);
         break;
-    case 18:
-        func_802A84F4(D_0F057EB4, 0x0000032FU, 0x00000400U);
-        func_802A84F4(D_0F0581E4, 0x00000369U, 0x00000400U);
-        func_802A84F4(D_0F058550, 0x00000364U, 0x00000400U);
+    case COURSE_DK_JUNGLE:
+        dma_textures(D_0F057EB4, 0x0000032FU, 0x00000400U);
+        dma_textures(D_0F0581E4, 0x00000369U, 0x00000400U);
+        dma_textures(D_0F058550, 0x00000364U, 0x00000400U);
         break;
     }
     func_80297818();
     destroy_all_actors();
-    func_8029DB44();
+    place_course_actors();
     func_800122D8();
 }
 
@@ -2508,7 +2516,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                     func_8000EE58(actorIndex);
                 case 7:
                     func_8029E7DC(compare);
-                    func_80296D10(compare, pos, rot, velocity, actorType);
+                    actor_init(compare, pos, rot, velocity, actorType);
                     return actorIndex;
                 default:
                     break;
@@ -2520,7 +2528,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                     func_8000EE58(actorIndex);
                 case 7:
                     func_8029E7DC(compare);
-                    func_80296D10(compare, pos, rot, velocity, actorType);
+                    actor_init(compare, pos, rot, velocity, actorType);
                     return actorIndex;
                 }
                 break;
@@ -2530,7 +2538,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                 case 4:
                 case 5:
                     func_8029E7DC(compare);
-                    func_80296D10(compare, pos, rot, velocity, actorType);
+                    actor_init(compare, pos, rot, velocity, actorType);
                     return actorIndex;
                 }
                 break;
@@ -2539,7 +2547,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                 case 1:
                 case 2:
                     func_8029E7DC(compare);
-                    func_80296D10(compare, pos, rot, velocity, actorType);
+                    actor_init(compare, pos, rot, velocity, actorType);
                     return actorIndex;
                 }
                 break;
@@ -2563,7 +2571,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                 func_8000EE58(actorIndex);
             case 7:
                 func_8029E7DC(compare);
-                func_80296D10(compare, pos, rot, velocity, actorType);
+                actor_init(compare, pos, rot, velocity, actorType);
                 return actorIndex;
             default:
                 break;
@@ -2575,7 +2583,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
                 func_8000EE58(actorIndex);
             case 7:
                 func_8029E7DC(compare);
-                func_80296D10(compare, pos, rot, velocity, actorType);
+                actor_init(compare, pos, rot, velocity, actorType);
                 return actorIndex;
             }
             break;
@@ -2585,7 +2593,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
             case 4:
             case 5:
                 func_8029E7DC(compare);
-                func_80296D10(compare, pos, rot, velocity, actorType);
+                actor_init(compare, pos, rot, velocity, actorType);
                 return actorIndex;
             }
             break;
@@ -2594,7 +2602,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
             case 1:
             case 2:
                 func_8029E7DC(compare);
-                func_80296D10(compare, pos, rot, velocity, actorType);
+                actor_init(compare, pos, rot, velocity, actorType);
                 return actorIndex;
             }
             break;
@@ -2606,7 +2614,7 @@ s16 func_8029E890(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
     return -1;
 }
 
-s16 func_8029EC88(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
+s16 addActorToEmptySlot(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
     s32 index;
 
     if (gNumActors >= ACTOR_LIST_SIZE) {
@@ -2615,7 +2623,7 @@ s16 func_8029EC88(Vec3f pos, Vec3s rot, Vec3f velocity, s16 actorType) {
     for(index = 0; index < ACTOR_LIST_SIZE; index++){
         if (gActorList[index].flags == 0) {
             gNumActors++;
-            func_80296D10(&gActorList[index], pos, rot, velocity, actorType);
+            actor_init(&gActorList[index], pos, rot, velocity, actorType);
             return index;
         }
     }
@@ -2628,7 +2636,7 @@ s16 func_8029ED38(Vec3f pos, s16 actorType) {
 
     vec3f_set(vel, 0.0f, 0.0f, 0.0f);
     vec3s_set(rot, 0, 0, 0);
-    return func_8029EC88(pos, rot, vel, actorType);
+    return addActorToEmptySlot(pos, rot, vel, actorType);
 }
 
 // I swear we have a struct that looks like this already but I cannot find it anywhere
@@ -3576,15 +3584,15 @@ void func_802A14BC(f32 arg0, f32 arg1, f32 arg2) {
     Vec3s sp20;
     s16 temp_a0;
 
-    if (gModeSelection != TIME_TRIALS) {
-        vec3s_set(sp20, 0, 0, 0);
-        vec3f_set(sp28, 0, 0, 0);
-        sp34[0] = arg0;
-        sp34[1] = arg1;
-        sp34[2] = arg2;
-        temp_a0 = func_8029EC88(sp34, sp20, sp28, 43);
-        D_802BA05C = &gActorList[temp_a0];
-    }
+    if (gModeSelection == TIME_TRIALS) { return; }
+
+    vec3s_set(sp20, 0, 0, 0);
+    vec3f_set(sp28, 0, 0, 0);
+    sp34[0] = arg0;
+    sp34[1] = arg1;
+    sp34[2] = arg2;
+    temp_a0 = addActorToEmptySlot(sp34, sp20, sp28, 43);
+    D_802BA05C = &gActorList[temp_a0];
 }
 
 void update_obj_item_box_hot_air_balloon(struct ItemBox *itemBox) {
@@ -4127,15 +4135,15 @@ void func_802A2F34(struct UnkStruct_800DC5EC *arg0) {
 }
 
 void func_802A3008(struct UnkStruct_800DC5EC *arg0) {
-    Camera *temp_s1 = arg0->camera;
+    Camera *camera = arg0->camera;
     u16 sp92 = arg0->pathCounter;
     s32 pad[12];
     s32 i;
 
     struct Actor *actor;
     Vec3f sp4C = {0.0f, 5.0f, 10.0f};
-    f32 sp48 = sins(temp_s1->rot[1] - 0x8000); // unk26;
-    f32 temp_f0 = coss(temp_s1->rot[1] - 0x8000);
+    f32 sp48 = sins(camera->rot[1] - 0x8000); // unk26;
+    f32 temp_f0 = coss(camera->rot[1] - 0x8000);
 
 
     D_801502C0[0][0] = temp_f0;
@@ -4158,7 +4166,7 @@ void func_802A3008(struct UnkStruct_800DC5EC *arg0) {
 
 
     if (gModeSelection != BATTLE) {
-        func_80297340(temp_s1);
+        func_80297340(camera);
     }
     D_8015F8E0 = 0;
 
@@ -4170,186 +4178,186 @@ void func_802A3008(struct UnkStruct_800DC5EC *arg0) {
         }
             switch (actor->type) {
                 case 2:
-                    func_80299144(temp_s1, D_801502C0, actor);
+                    func_80299144(camera, D_801502C0, actor);
                     break;
                 case 3:
-                    func_8029930C(temp_s1, D_801502C0, actor);
+                    func_8029930C(camera, D_801502C0, actor);
                     break;
                 case 4:
-                    func_802994D4(temp_s1, D_801502C0, actor);
+                    func_802994D4(camera, D_801502C0, actor);
                     break;
                 case 19:
-                    func_8029969C(temp_s1, D_801502C0, actor);
+                    func_8029969C(camera, D_801502C0, actor);
                     break;
                 case 26:
-                    func_80299864(temp_s1, D_801502C0, actor);
+                    func_80299864(camera, D_801502C0, actor);
                     break;
                 case 28:
-                    func_80299A2C(temp_s1, D_801502C0, actor);
+                    func_80299A2C(camera, D_801502C0, actor);
                     break;
                 case 33:
-                    func_80299BF4(temp_s1, D_801502C0, actor);
+                    func_80299BF4(camera, D_801502C0, actor);
                     break;
                 case 29:
-                    func_80299DBC(temp_s1, D_801502C0, actor);
+                    func_80299DBC(camera, D_801502C0, actor);
                     break;
                 case 30:
-                    func_80299EDC(temp_s1, D_801502C0, actor);
+                    func_80299EDC(camera, D_801502C0, actor);
                     break;
                 case 31:
-                    func_80299FFC(temp_s1, D_801502C0, actor);
+                    func_80299FFC(camera, D_801502C0, actor);
                     break;
                 case 32:
-                    func_8029A11C(temp_s1, D_801502C0, actor);
+                    func_8029A11C(camera, D_801502C0, actor);
                     break;
                 case ACTOR_FALLING_ROCK:
-                    func_8029CA90(temp_s1, (struct FallingRock *) actor);
+                    func_8029CA90(camera, (struct FallingRock *) actor);
                     break;
                 case ACTOR_KIWANO_FRUIT:
-                    func_8029A23C(temp_s1, D_801502C0, actor);
+                    func_8029A23C(camera, D_801502C0, actor);
                     break;
                 case ACTOR_BANANA:
-                    func_8029A8F4(temp_s1, D_801502C0, actor);
+                    func_8029A8F4(camera, D_801502C0, actor);
                     break;
                 case ACTOR_GREEN_SHELL:
-                    func_8029A690(temp_s1, D_801502C0, (struct ShellActor *) actor);
+                    func_8029A690(camera, D_801502C0, (struct ShellActor *) actor);
                     break;
                 case ACTOR_RED_SHELL:
-                    func_8029A75C(temp_s1, D_801502C0, (struct ShellActor *) actor);
+                    func_8029A75C(camera, D_801502C0, (struct ShellActor *) actor);
                     break;
                 case ACTOR_BLUE_SPINY_SHELL:
-                    func_8029A828(temp_s1, D_801502C0, (struct ShellActor *) actor);
+                    func_8029A828(camera, D_801502C0, (struct ShellActor *) actor);
                     break;
                 case ACTOR_PIRANHA_PLANT:
-                    func_80298328(temp_s1, D_801502C0, actor);
+                    func_80298328(camera, D_801502C0, actor);
                     break;
                 case ACTOR_TRAIN_ENGINE:
-                    func_8029B8E8(temp_s1, (struct TrainCar *) actor);
+                    func_8029B8E8(camera, (struct TrainCar *) actor);
                     break;
                 case ACTOR_TRAIN_TENDER:
-                    func_8029BFB0(temp_s1, (struct TrainCar *) actor);
+                    func_8029BFB0(camera, (struct TrainCar *) actor);
                     break;
                 case ACTOR_TRAIN_PASSENGER_CAR:
-                    func_8029C3CC(temp_s1, (struct TrainCar *) actor);
+                    func_8029C3CC(camera, (struct TrainCar *) actor);
                     break;
                 case 18:
-                    func_80297A50(temp_s1, D_801502C0, actor);
+                    func_80297A50(camera, D_801502C0, actor);
                     break;
                 case 20:
-                    func_8029AC18(temp_s1, D_801502C0, actor);
+                    func_8029AC18(camera, D_801502C0, actor);
                     break;
                 case ACTOR_MARIO_RACEWAY_SIGN:
-                    func_802A29BC(temp_s1, D_801502C0, actor);
+                    func_802A29BC(camera, D_801502C0, actor);
                     break;
                 case ACTOR_WARIO_STADIUM_SIGN:
-                    func_802A269C(temp_s1, actor);
+                    func_802A269C(camera, actor);
                     break;
                 case ACTOR_PALM_TREE:
-                    func_802A2C78(temp_s1, D_801502C0, actor);
+                    func_802A2C78(camera, D_801502C0, actor);
                     break;
                 case ACTOR_PADDLE_WHEEL_BOAT:
-                    func_8029AE1C(temp_s1, actor, D_801502C0, sp92);
+                    func_8029AE1C(camera, actor, D_801502C0, sp92);
                     break;
                 case ACTOR_BOX_TRUCK:
-                    func_8029B06C(temp_s1, actor);
+                    func_8029B06C(camera, actor);
                     break;
                 case ACTOR_SCHOOL_BUS:
-                    func_8029B2E4(temp_s1, actor);
+                    func_8029B2E4(camera, actor);
                     break;
                 case ACTOR_TANKER_TRUCK:
-                    func_8029B6EC(temp_s1, actor);
+                    func_8029B6EC(camera, actor);
                     break;
                 case ACTOR_CAR:
-                    func_8029B4E0(temp_s1, actor);
+                    func_8029B4E0(camera, actor);
                     break;
                 case ACTOR_RAILROAD_CROSSING:
-                    func_802A2AD0(temp_s1, actor);
+                    func_802A2AD0(camera, actor);
                     break;
                 case ACTOR_YOSHI_VALLEY_EGG:
-                    func_802A27A0(temp_s1, D_801502C0, actor, sp92);
+                    func_802A27A0(camera, D_801502C0, actor, sp92);
                     break;
             }
     }
     switch (gCurrentCourseId) {
         case COURSE_MOO_MOO_FARM:
-            func_802986B4(temp_s1, D_801502C0, actor);
+            func_802986B4(camera, D_801502C0, actor);
             break;
         case COURSE_DK_JUNGLE:
-            func_80298D7C(temp_s1, D_801502C0, actor);
+            func_80298D7C(camera, D_801502C0, actor);
             break;
     }
 }
 
 void update_simple_objects(void) {
-    struct Actor *phi_s0;
+    struct Actor *actor;
     s32 i;
     for (i = 0; i < ACTOR_LIST_SIZE; i++) {
 
-        phi_s0 = &gActorList[i];
-        if (phi_s0->flags == 0) {
+        actor = &gActorList[i];
+        if (actor->flags == 0) {
             continue;
         }
 
-        switch (phi_s0->type) {
+        switch (actor->type) {
             case ACTOR_FALLING_ROCK:
-                update_obj_falling_rocks(phi_s0);
+                update_obj_falling_rocks(actor);
                 break;
             case ACTOR_GREEN_SHELL:
-                update_obj_green_shell(phi_s0);
+                update_obj_green_shell(actor);
                 break;
             case ACTOR_RED_SHELL:
-                update_obj_red_blue_shell(phi_s0);
+                update_obj_red_blue_shell(actor);
                 break;
             case ACTOR_BLUE_SPINY_SHELL:
-                update_obj_red_blue_shell(phi_s0);
+                update_obj_red_blue_shell(actor);
                 break;
             case ACTOR_KIWANO_FRUIT:
-                update_obj_kiwano_fruit(phi_s0);
+                update_obj_kiwano_fruit(actor);
                 break;
             case ACTOR_BANANA:
-                update_obj_banana(phi_s0);
+                update_obj_banana(actor);
                 break;
             case ACTOR_PADDLE_WHEEL_BOAT:
-                update_obj_paddle_wheel(phi_s0);
+                update_obj_paddle_wheel(actor);
                 break;
             case ACTOR_TRAIN_ENGINE:
-                update_obj_train_engine(phi_s0);
+                update_obj_train_engine(actor);
                 break;
             case ACTOR_TRAIN_TENDER:
-                update_obj_train_car1(phi_s0);
+                update_obj_train_car1(actor);
                 break;
             case ACTOR_TRAIN_PASSENGER_CAR:
-                update_obj_train_car2(phi_s0);
+                update_obj_train_car2(actor);
                 break;
             case ACTOR_ITEM_BOX:
-                update_obj_item_box(phi_s0);
+                update_obj_item_box(actor);
                 break;
             case ACTOR_HOT_AIR_BALLOON_ITEM_BOX:
-                update_obj_item_box_hot_air_balloon(phi_s0);
+                update_obj_item_box_hot_air_balloon(actor);
                 break;
             case ACTOR_FAKE_ITEM_BOX:
-                update_obj_fake_item_box(phi_s0);
+                update_obj_fake_item_box(actor);
                 break;
             case ACTOR_PIRANHA_PLANT:
-                update_obj_piranha_plant(phi_s0);
+                update_obj_piranha_plant(actor);
                 break;
             case ACTOR_BANANA_BUNCH:
-                update_obj_banana_bunch(phi_s0);
+                update_obj_banana_bunch(actor);
                 break;
             case ACTOR_TRIPLE_GREEN_SHELL:
-                update_obj_triple_shell(phi_s0, ACTOR_GREEN_SHELL);
+                update_obj_triple_shell(actor, ACTOR_GREEN_SHELL);
                 break;
             case ACTOR_TRIPLE_RED_SHELL:
-                update_obj_triple_shell(phi_s0, ACTOR_RED_SHELL);
+                update_obj_triple_shell(actor, ACTOR_RED_SHELL);
                 break;
             case ACTOR_MARIO_RACEWAY_SIGN:
-                update_obj_mario_raceway_sign(phi_s0);
+                update_obj_mario_raceway_sign(actor);
                 break;
             case ACTOR_WARIO_STADIUM_SIGN:
-                update_obj_wario_stadium_sign(phi_s0);
+                update_obj_wario_stadium_sign(actor);
                 break;
             case ACTOR_RAILROAD_CROSSING:
-                update_obj_railroad_crossing(phi_s0);
+                update_obj_railroad_crossing(actor);
                 break;
             case 2:
             case 3:
@@ -4364,10 +4372,10 @@ void update_simple_objects(void) {
             case 31:
             case 32:
             case 33:
-                update_obj_trees_cacti_shrubs(phi_s0);
+                update_obj_trees_cacti_shrubs(actor);
                 break;
             case ACTOR_YOSHI_VALLEY_EGG:
-                update_obj_yoshi_valley_egg(phi_s0);
+                update_obj_yoshi_valley_egg(actor);
                 break;
             }
         }

@@ -6,6 +6,11 @@
 #include "code_80004740.h"
 #include "memory.h"
 
+Vec3s D_80162D70;
+s16 D_80162D76;
+s16 D_80162D78;
+s16 D_80162D7A;
+
 void func_80004740(Mtx *dest, Mat4 src) {
 #ifdef AVOID_UB
     // Avoid type-casting which is technically UB by calling the equivalent
@@ -267,15 +272,9 @@ s16 func_80004DFC(u32 arg0, u32 arg1, s16 arg2, s16 arg3) {
 GLOBAL_ASM("asm/non_matchings/code_80004740/func_80004DFC.s")
 #endif
 
-struct stru_80004EAC {
-    s32 unk0;
-    s32 unk4;
-    s16 unk8;
-};
-
 s16 func_80004EAC(void *addr, s16 offset) {
     uintptr_t *item = segmented_to_virtual(addr);
-    struct stru_80004EAC *temp = segmented_to_virtual(item[offset]);
+    struct stru_80004EAC *temp = (struct stru_80004EAC *) segmented_to_virtual((void *) item[offset]);
     
     return temp->unk8 - 1;
 }

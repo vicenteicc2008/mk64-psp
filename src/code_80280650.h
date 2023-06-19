@@ -66,6 +66,7 @@ struct UnkStruct_8028088C {
     s32 unk3C;
 };
 
+void func_80281438(void);
 void func_80280650();
 void func_80280658(struct UnkStruct_80280658*);
 struct UnkStruct_80280658 *func_802806C8();
@@ -92,13 +93,11 @@ void ending_sequence_loop();
 
 extern struct UnkStruct_80280658 *D_802874F8;
 extern struct UnkStruct_80280658 *D_80284E7C;
-extern f32  D_80286B74;
-extern f32  D_80286B78;
-extern f32  D_80286B7C;
-extern s32  D_80284E88;
+extern struct UnkStruct_80280658 *D_80284E88;
+
 extern s32  D_802874E0;
 extern s8   D_802874F4;
-extern s32  D_802874D4;
+extern Gfx *D_802874D4;
 extern s32  D_802874FC;
 extern Mat4 D_80287500;
 extern s16  D_80164AF0;

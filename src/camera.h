@@ -61,11 +61,15 @@ void func_8001D794(Player*, Camera*, Vec3f, f32*, f32*, f32*, s16);
 void func_8001E0C4(Camera*, Player*, s8);
 void func_8001E8E8(Camera*, Player*, s8);
 void func_8001F87C(s32);
+void func_8001EE98(Player*, Camera*, s8);
+void func_8001F394(Player*, f32*);
 
 extern s32 D_80164A2C;
 extern f32 D_80164A30;
 extern f32 D_80164A90[];
 extern f32 D_80164AA0[];
+
+extern f32 D_800DDB30[];
 
 extern Camera cameras[];
 extern Camera *camera1;
